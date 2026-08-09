@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Autorizar Busca de Arquivos — BuscaÁgil</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'], mono: ['Space Grotesk','monospace'] } } }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="grid-bg min-h-screen flex flex-col">
+
+  <div class="aurora-bg">
+    <div class="aurora-orb"></div>
+  </div>
+
+  <!-- Header -->
+  <nav class="glass px-6 h-16 flex items-center justify-between relative z-10">
+    <a href="index.html" class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,var(--violet),var(--cyan))">
+        <i data-lucide="search" class="w-4 h-4 text-white"></i>
+      </div>
+      <span class="logo-text text-lg text-white">Busca<span class="gradient-text">Ágil</span></span>
+    </a>
+    <div class="flex items-center gap-3">
+      <img id="user-avatar-nav" src="" alt="Avatar" class="avatar avatar-sm hidden" />
+      <span id="user-name-nav" class="text-sm hidden" style="color:var(--text-2);font-family:'Space Grotesk',sans-serif"></span>
+    </div>
+  </nav>
+
+  <!-- Main Authorization Step -->
+  <main class="flex-1 flex items-center justify-center px-5 py-12 relative z-10">
+    <div class="w-full max-w-lg fade-up">
+
+      <!-- Steps -->
+      <div class="flex items-center justify-center gap-2 mb-8">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold bg-green-500 text-white">✓</div>
+          <span class="text-xs font-semibold text-green-400" style="font-family:'Space Grotesk',sans-serif">Google Logged</span>
+        </div>
+        <div class="h-px w-8" style="background:var(--border-2)"></div>
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white pulse" style="background:var(--violet)">2</div>
+          <span class="text-xs font-semibold text-white" style="font-family:'Space Grotesk',sans-serif">Permissão de Busca</span>
+        </div>
+        <div class="h-px w-8" style="background:var(--border)"></div>
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style="background:var(--bg-card);color:var(--text-3);border:1px solid var(--border)">3</div>
+          <span class="text-xs" style="color:var(--text-3);font-family:'Space Grotesk',sans-serif">Mecanismo de Busca</span>
+        </div>
+      </div>
+
+      <!-- Card -->
+      <div class="glass-2 rounded-3xl p-8 border shadow-2xl" style="border-color:var(--border-2)">
+
+        <div class="flex justify-center mb-6">
+          <div class="w-20 h-20 rounded-3xl flex items-center justify-center float" style="background:rgba(124,58,237,0.15);border:1.5px solid var(--border-3)">
+            <i data-lucide="shield-search" class="w-10 h-10" style="color:var(--violet-light)"></i>
+          </div>
+        </div>
+
+        <h1 class="text-2xl font-extrabold text-center text-white mb-2" style="font-family:'Space Grotesk',sans-serif">
+          Permissão para indexar e buscar
+        </h1>
+        <p class="text-xs sm:text-sm text-center mb-8" style="color:var(--text-2)">
+          Para que o BuscaÁgil consiga localizar qualquer arquivo instantaneamente no seu Google Drive, precisamos das seguintes autorizações de leitura:
+        </p>
+
+        <!-- Permissions -->
+        <div class="flex flex-col gap-3 mb-8">
+          <div class="flex items-start gap-4 p-4 rounded-2xl" style="background:var(--bg-card);border:1px solid var(--border)">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style="background:rgba(34,211,238,0.15);color:var(--cyan)">
+              <i data-lucide="search" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-white mb-1" style="font-family:'Space Grotesk',sans-serif">Indexação de busca em tempo real</p>
+              <p class="text-xs" style="color:var(--text-2)">Pesquisar nomes de arquivos, extensões, datas e palavras-chave de seus arquivos.</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-4 p-4 rounded-2xl" style="background:var(--bg-card);border:1px solid var(--border)">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style="background:rgba(124,58,237,0.15);color:var(--violet-light)">
+              <i data-lucide="eye" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-white mb-1" style="font-family:'Space Grotesk',sans-serif">Geração de miniaturas e pré-visualização</p>
+              <p class="text-xs" style="color:var(--text-2)">Exibir miniaturas de imagens, documentos e mídias diretamente nos resultados da busca.</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-4 p-4 rounded-2xl" style="background:var(--bg-card);border:1px solid var(--border)">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style="background:rgba(34,197,94,0.15);color:#4ade80">
+              <i data-lucide="upload-cloud" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-sm font-bold text-white mb-1" style="font-family:'Space Grotesk',sans-serif">Envio de novos arquivos</p>
+              <p class="text-xs" style="color:var(--text-2)">Permite arrastar e enviar novos arquivos diretamente da plataforma para o seu Drive.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div id="auth-idle">
+          <button id="authorize-btn" class="btn btn-violet w-full btn-lg mb-3" onclick="doAuthorize()">
+            <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+            <span>Conceder acesso e Abrir Busca</span>
+          </button>
+          <button onclick="mockLogout()" class="btn btn-ghost w-full text-xs" style="color:var(--text-3)">
+            Sair e usar outra conta
+          </button>
+        </div>
+
+        <div id="auth-loading" class="hidden flex-col items-center gap-4 py-4">
+          <div class="w-10 h-10 border-2 rounded-full spin" style="border-color:var(--violet);border-top-color:transparent"></div>
+          <p class="text-sm font-semibold text-white" style="font-family:'Space Grotesk',sans-serif">Conectando mecanismo ao Google Drive...</p>
+        </div>
+
+        <div id="auth-success" class="hidden flex-col items-center gap-4 py-4 text-center">
+          <div class="w-14 h-14 rounded-full flex items-center justify-center bg-green-500/20 text-green-400">
+            <i data-lucide="check" class="w-8 h-8"></i>
+          </div>
+          <p class="text-base font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Mecanismo ativado com sucesso!</p>
+          <p class="text-xs" style="color:var(--text-2)">Carregando o painel de busca...</p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script src="js/mock-data.js"></script>
+  <script src="js/mock-auth.js"></script>
+  <script>
+    lucide.createIcons();
+
+    if (isDriveAuthorized()) { window.location.href = 'dashboard.html'; }
+    if (!isLoggedIn()) { window.location.href = 'index.html'; }
+
+    const user = getCurrentUser();
+    if (user) {
+      document.getElementById('user-avatar-nav').src = user.avatar;
+      document.getElementById('user-avatar-nav').classList.remove('hidden');
+      document.getElementById('user-name-nav').textContent = user.name;
+      document.getElementById('user-name-nav').classList.remove('hidden');
+    }
+
+    async function doAuthorize() {
+      const idle = document.getElementById('auth-idle');
+      const loading = document.getElementById('auth-loading');
+      const success = document.getElementById('auth-success');
+
+      idle.classList.add('hidden');
+      loading.classList.remove('hidden');
+      loading.classList.add('flex');
+
+      try {
+        await mockAuthorizeDrive();
+        loading.classList.add('hidden');
+        loading.classList.remove('flex');
+        success.classList.remove('hidden');
+        success.classList.add('flex');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 1500);
+      } catch (e) {
+        loading.classList.add('hidden');
+        loading.classList.remove('flex');
+        idle.classList.remove('hidden');
+      }
+    }
+  </script>
+</body>
+</html>

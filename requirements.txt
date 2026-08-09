@@ -1,0 +1,15 @@
+# Dependencias Python do BuscaAgil
+# Instale com: pip install -r requirements.txt
+
+Django>=5.1,<6.0
+google-genai
+pydantic
+pandas
+openpyxl
+xlrd
+python-docx
+requests
+beautifulsoup4
+
+# Para ler arquivos .doc legados, instale tambem no sistema:
+# sudo apt-get install antiword
