@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -5,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>BuscaÁgil — Encontre qualquer arquivo em segundos</title>
   <meta name="description" content="BuscaÁgil é o mecanismo de busca definitivo para todos os seus arquivos do Google Drive. PDFs, imagens, documentos, vídeos e links em um só lugar." />
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -275,8 +276,8 @@
 
   <div class="toast-container" id="toast-container"></div>
 
-  <script src="js/mock-data.js"></script>
-  <script src="js/mock-auth.js"></script>
+  <script src="{% static 'js/mock-data.js' %}"></script>
+  <script src="{% static 'js/mock-auth.js' %}"></script>
   <script>
     lucide.createIcons();
 

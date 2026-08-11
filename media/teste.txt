@@ -1,0 +1,23 @@
+# Cibersegurança
+
+A cibersegurança é o conjunto de práticas, tecnologias, processos e políticas utilizados para proteger sistemas computacionais, redes, dispositivos, aplicações e informações contra acessos não autorizados, ataques cibernéticos, alterações indevidas, perdas e outros tipos de ameaças digitais.
+
+Com o crescimento da utilização da tecnologia e da internet, empresas, instituições e usuários passaram a armazenar e compartilhar grandes quantidades de informações em ambientes digitais. Dados pessoais, informações financeiras, documentos, credenciais de acesso e informações estratégicas passaram a ser alvos importantes para criminosos cibernéticos. Dessa forma, a cibersegurança tornou-se fundamental para garantir a proteção das informações e a continuidade das atividades.
+
+Um dos principais objetivos da cibersegurança está relacionado à **tríade CIA**, formada pelos princípios de **Confidencialidade, Integridade e Disponibilidade**. A confidencialidade busca garantir que somente pessoas autorizadas tenham acesso às informações. A integridade procura assegurar que os dados não sejam alterados ou manipulados de forma indevida. Já a disponibilidade garante que sistemas e informações estejam acessíveis aos usuários autorizados quando forem necessários.
+
+Entre as principais ameaças cibernéticas estão os **malwares**, como vírus, worms, trojans e ransomware; os ataques de **phishing**, que utilizam mensagens falsas para induzir usuários a fornecer informações confidenciais; ataques de força bruta destinados a descobrir senhas; engenharia social; ataques de negação de serviço (DDoS); exploração de vulnerabilidades em sistemas; e vazamentos de dados.
+
+O **ransomware**, por exemplo, é uma ameaça que pode criptografar arquivos ou impedir o acesso a sistemas, exigindo posteriormente um pagamento para que a vítima possa recuperar seus dados. Já o phishing normalmente utiliza e-mails, mensagens ou páginas falsas que imitam serviços legítimos com o objetivo de obter senhas, dados bancários ou outras informações sensíveis.
+
+A proteção contra essas ameaças depende da utilização de diferentes mecanismos de segurança. Entre eles estão os **firewalls**, sistemas de detecção e prevenção de intrusões, antivírus e ferramentas de monitoramento, além da utilização de criptografia, autenticação multifator, controle de acesso e realização periódica de backups.
+
+Entretanto, a cibersegurança não depende apenas de ferramentas tecnológicas. O comportamento dos usuários também representa um importante fator de segurança. Funcionários e usuários devem ser orientados a utilizar senhas fortes, evitar o compartilhamento de credenciais, verificar a legitimidade de links e arquivos recebidos e manter sistemas e aplicativos atualizados.
+
+Nas organizações, também é importante estabelecer políticas de segurança da informação, definir níveis de acesso de acordo com as funções dos colaboradores, monitorar eventos de segurança e possuir procedimentos para resposta a incidentes. Dessa maneira, caso ocorra um ataque, a organização poderá identificar o problema, reduzir seus impactos e recuperar os serviços afetados.
+
+Outro aspecto importante é a realização de **backups periódicos**. Manter cópias de segurança dos dados em ambientes protegidos permite recuperar informações em situações como falhas de hardware, exclusões acidentais, corrupção de dados ou ataques de ransomware.
+
+Portanto, a cibersegurança deve ser compreendida como um processo contínuo. Novas tecnologias e serviços digitais também criam novas possibilidades de ataques, fazendo com que empresas e usuários precisem constantemente avaliar seus riscos, atualizar seus sistemas e aprimorar suas práticas de proteção.
+
+Em síntese, a cibersegurança tem como principal finalidade proteger informações, sistemas e usuários contra ameaças digitais, garantindo a confidencialidade, integridade e disponibilidade dos recursos tecnológicos. A combinação entre tecnologias de segurança, políticas organizacionais, capacitação dos usuários e monitoramento contínuo é essencial para reduzir os riscos e aumentar a segurança no ambiente digital.
