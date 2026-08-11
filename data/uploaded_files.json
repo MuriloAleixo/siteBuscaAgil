@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "id": "teste_WmFSazE.txt",
+      "name": "teste.txt",
+      "type": "doc",
+      "content_type": "text/plain",
+      "size": 3654,
+      "created_at": "2026-08-11T21:47:14.912175+00:00",
+      "url": "/media/teste_WmFSazE.txt",
+      "category": null,
+      "tags": [],
+      "description": ""
+    },
+    {
+      "id": "teste.txt",
+      "name": "teste.txt",
+      "type": "doc",
+      "content_type": "text/plain",
+      "size": 3654,
+      "created_at": "2026-08-11T21:40:54+00:00",
+      "url": "/media/teste.txt",
+      "category": null,
+      "tags": [],
+      "description": ""
+    }
+  ]
+}

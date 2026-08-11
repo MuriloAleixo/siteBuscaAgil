@@ -56,6 +56,41 @@ catalog = FileCatalog("catalog.json")
 catalog.update_cloud_path(resultado["file_id"], drive_url)
 ```
 
+## Integração com o Django (já implementada)
+
+`core/views.py` chama o pipeline automaticamente em duas views:
+
+- **`POST /upload`** (`upload_files`): depois de salvar o arquivo em `media/`
+  via `FileSystemStorage`, chama `_classify_and_catalog(...)`, que roda
+  `processar_upload(caminho_salvo, catalog_path=CATALOG_PATH)` e depois
+  `catalog.update_cloud_path(file_id, public_url)` — como não há upload real
+  pro Google Drive nesse projeto, a "cloud_path" registrada é a própria URL
+  pública servida pelo Django (`/media/<arquivo>`). O `catalog.json` fica na
+  raiz do projeto (`CATALOG_PATH = BASE_DIR / "catalog.json"`).
+
+  A classificação é **best-effort**: se faltar `GEMINI_API_KEY`, se o
+  formato não for suportado por `extrator_conteudo.py`, ou se a API do
+  Gemini falhar, o upload continua funcionando normalmente — só não grava
+  classificação para aquele arquivo (fica com `"classification": null` na
+  resposta e sem `category`/`tags` na listagem).
+
+- **`GET /files`** (`list_uploaded_files`): lista os arquivos físicos em
+  `media/` e enriquece cada um com `category`, `tags` e `description` lidos
+  do `catalog.json` (casando pelo nome do arquivo salvo). O front-end
+  (`static/js/mock-data.js` → `loadUploadedFiles()`) consome esse endpoint e
+  mescla os arquivos reais nas telas de **dashboard** e **busca**, incluindo
+  a categoria do Gemini como tag pesquisável.
+
+Para ativar a classificação automática, defina a variável de ambiente antes
+de subir o servidor:
+
+```bash
+export GEMINI_API_KEY="sua_chave_aqui"
+```
+
+Sem a chave, o site continua funcional — os arquivos aparecem no dashboard e
+na busca normalmente, apenas sem categoria/tags automáticas.
+
 ## Dependências
 
 ```bash

@@ -128,5 +128,8 @@ if (qParam) {
   clearBtn.classList.remove('hidden');
 }
 
-// Initial Run
-runSearch();
+// Initial Run — load real uploaded files first, then search
+(async function initSearch() {
+  await loadUploadedFiles();
+  runSearch();
+})();

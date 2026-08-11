@@ -25,189 +25,9 @@ const FILE_TYPES = {
   archive:  { label: "Arquivo",   icon: "archive",      color: "#8888aa",  bg: "rgba(136,136,170,0.12)"},
 };
 
-const MOCK_FILES = [
-  {
-    id: "f_001",
-    name: "Design System BuscaÁgil.pdf",
-    type: "pdf",
-    size: 2340000,
-    createdAt: "2025-07-28T10:15:00Z",
-    updatedAt: "2025-07-28T10:15:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: true,
-    tags: ["design", "ui"],
-  },
-  {
-    id: "f_002",
-    name: "Banner Campanha Verão.png",
-    type: "image",
-    size: 854000,
-    createdAt: "2025-07-30T14:22:00Z",
-    updatedAt: "2025-07-30T14:22:00Z",
-    previewUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=600&q=80",
-    driveUrl: "#",
-    starred: false,
-    tags: ["marketing", "banner"],
-  },
-  {
-    id: "f_003",
-    name: "Reunião de Planejamento Q3.mp4",
-    type: "video",
-    size: 145200000,
-    createdAt: "2025-08-01T09:00:00Z",
-    updatedAt: "2025-08-01T09:00:00Z",
-    previewUrl: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=600&q=80",
-    driveUrl: "#",
-    starred: true,
-    tags: ["reunião", "q3"],
-  },
-  {
-    id: "f_004",
-    name: "Relatório Anual 2024.pdf",
-    type: "pdf",
-    size: 5100000,
-    createdAt: "2025-08-02T11:30:00Z",
-    updatedAt: "2025-08-02T11:30:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: false,
-    tags: ["relatório", "financeiro"],
-  },
-  {
-    id: "f_005",
-    name: "Foto do Produto — Vista Frontal.jpg",
-    type: "image",
-    size: 1230000,
-    createdAt: "2025-08-03T08:45:00Z",
-    updatedAt: "2025-08-03T08:45:00Z",
-    previewUrl: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=600&q=80",
-    driveUrl: "#",
-    starred: false,
-    tags: ["produto", "foto"],
-  },
-  {
-    id: "f_006",
-    name: "Planilha de Orçamento 2025.xlsx",
-    type: "sheet",
-    size: 430000,
-    createdAt: "2025-08-04T16:00:00Z",
-    updatedAt: "2025-08-05T09:10:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: true,
-    tags: ["financeiro", "orçamento"],
-  },
-  {
-    id: "f_007",
-    name: "Tutorial de Onboarding.mp4",
-    type: "video",
-    size: 98700000,
-    createdAt: "2025-08-05T13:20:00Z",
-    updatedAt: "2025-08-05T13:20:00Z",
-    previewUrl: "https://images.unsplash.com/photo-1616469829581-73993eb86b02?w=600&q=80",
-    driveUrl: "#",
-    starred: false,
-    tags: ["tutorial", "onboarding"],
-  },
-  {
-    id: "f_008",
-    name: "Contrato de Prestação de Serviços.docx",
-    type: "doc",
-    size: 187000,
-    createdAt: "2025-08-05T17:00:00Z",
-    updatedAt: "2025-08-06T10:00:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: false,
-    tags: ["contrato", "jurídico"],
-  },
-  {
-    id: "f_009",
-    name: "Paleta de Cores Oficial.png",
-    type: "image",
-    size: 320000,
-    createdAt: "2025-08-06T09:30:00Z",
-    updatedAt: "2025-08-06T09:30:00Z",
-    previewUrl: "https://images.unsplash.com/photo-1500462918059-b1a0cb512f1d?w=600&q=80",
-    driveUrl: "#",
-    starred: true,
-    tags: ["design", "cores"],
-  },
-  {
-    id: "f_010",
-    name: "Link — Figma Design System",
-    type: "link",
-    size: 0,
-    createdAt: "2025-08-06T11:15:00Z",
-    updatedAt: "2025-08-06T11:15:00Z",
-    previewUrl: null,
-    driveUrl: "https://figma.com",
-    starred: false,
-    tags: ["figma", "design"],
-    url: "https://figma.com/file/example",
-  },
-  {
-    id: "f_011",
-    name: "Podcast Episódio 12 — Inovação.mp3",
-    type: "audio",
-    size: 42300000,
-    createdAt: "2025-08-07T08:00:00Z",
-    updatedAt: "2025-08-07T08:00:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: false,
-    tags: ["podcast", "áudio"],
-  },
-  {
-    id: "f_012",
-    name: "Proposta Comercial Cliente XYZ.pdf",
-    type: "pdf",
-    size: 1750000,
-    createdAt: "2025-08-07T14:00:00Z",
-    updatedAt: "2025-08-07T14:00:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: true,
-    tags: ["proposta", "vendas"],
-  },
-  {
-    id: "f_013",
-    name: "Backup Projeto.zip",
-    type: "archive",
-    size: 78600000,
-    createdAt: "2025-08-07T19:30:00Z",
-    updatedAt: "2025-08-07T19:30:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: false,
-    tags: ["backup", "projeto"],
-  },
-  {
-    id: "f_014",
-    name: "Foto Equipe 2025.jpg",
-    type: "image",
-    size: 2100000,
-    createdAt: "2025-08-08T10:00:00Z",
-    updatedAt: "2025-08-08T10:00:00Z",
-    previewUrl: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80",
-    driveUrl: "#",
-    starred: false,
-    tags: ["equipe", "foto"],
-  },
-  {
-    id: "f_015",
-    name: "Notas de Reunião — Agosto.docx",
-    type: "doc",
-    size: 95000,
-    createdAt: "2025-08-08T15:45:00Z",
-    updatedAt: "2025-08-08T15:45:00Z",
-    previewUrl: null,
-    driveUrl: "#",
-    starred: false,
-    tags: ["reunião", "notas"],
-  },
-];
+// Sem dados estáticos: a lista é populada em runtime por loadUploadedFiles(),
+// que busca os arquivos reais em /files (lidos de data/uploaded_files.json).
+const MOCK_FILES = [];
 
 // =============================================================
 // Helper Functions
@@ -248,6 +68,51 @@ function searchFiles(query, filterType = "all") {
     );
   }
   return results;
+}
+
+// =============================================================
+// Real uploaded files — fetched from the Django backend (/files)
+// and merged into MOCK_FILES so dashboard/search reflect uploads.
+// =============================================================
+const UPLOADED_FILES_API_URL =
+  window.BUSCA_AGIL_FILES_URL ||
+  (window.location.protocol === "file:" ? "http://localhost:8000/files" : "/files");
+
+async function loadUploadedFiles() {
+  try {
+    const res = await fetch(UPLOADED_FILES_API_URL);
+    if (!res.ok) return [];
+    const data = await res.json();
+    const uploaded = (data.files || []).map((f) => {
+      const tags = [...(f.tags || [])];
+      if (f.category && !tags.includes(f.category)) tags.push(f.category);
+      return {
+        id: f.id,
+        name: f.name,
+        type: f.type,
+        size: f.size,
+        createdAt: f.created_at,
+        updatedAt: f.created_at,
+        previewUrl: f.type === "image" ? f.url : null,
+        driveUrl: f.url,
+        starred: false,
+        tags,
+        category: f.category || null,
+        description: f.description || "",
+      };
+    });
+
+    uploaded.forEach((file) => {
+      const idx = MOCK_FILES.findIndex((existing) => existing.id === file.id);
+      if (idx !== -1) MOCK_FILES.splice(idx, 1);
+    });
+    MOCK_FILES.unshift(...uploaded);
+
+    return uploaded;
+  } catch (e) {
+    console.warn("Não foi possível carregar os arquivos enviados:", e);
+    return [];
+  }
 }
 
 function getStorageStats() {

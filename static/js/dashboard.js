@@ -7,7 +7,6 @@ lucide.createIcons();
 if (!requireAuth()) throw new Error('Not authenticated');
 
 const user = getCurrentUser();
-const stats = getStorageStats();
 
 let currentView = 'grid';
 let currentType = 'all';
@@ -17,12 +16,15 @@ document.getElementById('header-avatar').src = user.avatar;
 document.getElementById('sidebar-avatar').src = user.avatar;
 document.getElementById('sidebar-name').textContent = user.name;
 
-// Storage bar
-const storagePct = (stats.storageUsed / stats.storageTotal * 100).toFixed(1);
-document.getElementById('storage-label').textContent = `${stats.storageUsed} GB / ${stats.storageTotal} GB`;
-setTimeout(() => {
-  document.getElementById('storage-bar').style.width = storagePct + '%';
-}, 300);
+function renderStorageBar() {
+  const stats = getStorageStats();
+  const storagePct = (stats.storageUsed / stats.storageTotal * 100).toFixed(1);
+  document.getElementById('storage-label').textContent = `${stats.storageUsed} GB / ${stats.storageTotal} GB`;
+  setTimeout(() => {
+    document.getElementById('storage-bar').style.width = storagePct + '%';
+  }, 300);
+}
+renderStorageBar();
 
 // View Toggle (Grid vs List)
 function setView(v) {
@@ -107,7 +109,7 @@ function renderFiles() {
     const typeLabel = getFileTypeInfo(currentType).label;
     statusText.textContent = `Filtrado por formato: ${typeLabel}`;
   } else {
-    statusText.textContent = 'Exibindo todos os arquivos do Google Drive';
+    statusText.textContent = 'Exibindo todos os arquivos enviados';
   }
   countBadge.textContent = `${files.length} arquivo(s)`;
 
@@ -195,5 +197,9 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay').classList.remove('open');
 }
 
-// Initial View Render
-setView('grid');
+// Initial View Render — load real uploaded files first, then render
+(async function initDashboard() {
+  await loadUploadedFiles();
+  renderStorageBar();
+  setView('grid');
+})();

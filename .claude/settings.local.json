@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\user\\\\Documents\\\\siteBuscaAgil\")",
+      "Bash(ls \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil/media\" 2>/dev/null)",
+      "Read(///wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil/**)",
+      "Read(///wsl.localhost/Ubuntu/home/user/Documents/**)",
+      "Bash(python3 manage.py check)",
+      "Bash(python manage.py check)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && ls | grep -i venv)",
+      "Bash(./venv/bin/python manage.py check)",
+      "Bash(./venv/Scripts/python.exe manage.py check)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && find venv -maxdepth 3 -iname \"python*\")",
+      "Bash(venv/bin/python manage.py check)",
+      "Bash(wsl.exe bash *)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && wsl.exe bash -lc \"cd /home/user/Documents/siteBuscaAgil && echo \\\\$GEMINI_API_KEY | head -c 10; echo; ls -la catalog.json 2>&1; venv/bin/python manage.py check\")",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && cat .gitignore 2>/dev/null | head -30)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && ls -la .gitignore 2>&1)",
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && wsl.exe bash -lc \"cd /home/user/Documents/siteBuscaAgil && nohup venv/bin/python manage.py runserver 127.0.0.1:8010 > /tmp/runserver.log 2>&1 & sleep 2 && cat /tmp/runserver.log\")"
+    ]
+  }
+}
