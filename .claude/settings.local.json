@@ -16,7 +16,30 @@
       "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && wsl.exe bash -lc \"cd /home/user/Documents/siteBuscaAgil && echo \\\\$GEMINI_API_KEY | head -c 10; echo; ls -la catalog.json 2>&1; venv/bin/python manage.py check\")",
       "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && cat .gitignore 2>/dev/null | head -30)",
       "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && ls -la .gitignore 2>&1)",
-      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && wsl.exe bash -lc \"cd /home/user/Documents/siteBuscaAgil && nohup venv/bin/python manage.py runserver 127.0.0.1:8010 > /tmp/runserver.log 2>&1 & sleep 2 && cat /tmp/runserver.log\")"
+      "Bash(cd \"//wsl.localhost/Ubuntu/home/user/Documents/siteBuscaAgil\" && wsl.exe bash -lc \"cd /home/user/Documents/siteBuscaAgil && nohup venv/bin/python manage.py runserver 127.0.0.1:8010 > /tmp/runserver.log 2>&1 & sleep 2 && cat /tmp/runserver.log\")",
+      "Bash(cat \"/mnt/c/Users/murilo.aleixo/../../home/user/Documents/siteBuscaAgil/data/uploaded_files.json\" 2>/dev/null | head -c 2000; echo \"---\"; ls \"/home/user/Documents/siteBuscaAgil\" 2>/dev/null)",
+      "Read(//mnt/c/home/user/Documents/siteBuscaAgil/data/**)",
+      "Read(//mnt/**)",
+      "Read(///wsl.localhost/Ubuntu//**)",
+      "Bash(wslpath -u '\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\user\\\\Documents\\\\siteBuscaAgil')",
+      "Bash(python manage.py runserver 0.0.0.0:8000)",
+      "Bash(curl -s http://localhost:8000/files)",
+      "Bash(sleep 3; cat /tmp/server.log 2>&1 | tail -30)",
+      "Read(//tmp/**)",
+      "PowerShell(& \".\\\\venv\\\\Scripts\\\\python.exe\" -c \"import py_compile; py_compile.compile\\('core/views.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(venv/bin/python3 -c \"import py_compile; py_compile.compile\\('core/views.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('core/views.py', doraise=True\\); py_compile.compile\\('core/urls.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(node --check static/js/upload.js)",
+      "Bash(node --check static/js/file-view.js)",
+      "Bash(pkill -f \"manage.py runserver\")",
+      "Bash(python -c \"import django\")",
+      "Bash(pip show *)",
+      "PowerShell(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object {$_.LocalPort -in \\(8000,5500,3000\\)} | Select-Object LocalAddress,LocalPort,OwningProcess)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/files\" -UseBasicParsing; Write-Output \"STATUS: $\\($r.StatusCode\\)\"; Write-Output $r.Content } catch { Write-Output \"ERROR: $\\($_.Exception.Message\\)\" })",
+      "Bash(git -C . status --short)",
+      "Bash(git -C . diff --stat)",
+      "Bash(git -C . log --oneline -5)",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('core/views.py', doraise=True\\); print\\('OK'\\)\")"
     ]
   }
 }

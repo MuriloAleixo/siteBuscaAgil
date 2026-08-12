@@ -9,6 +9,7 @@ const user = getCurrentUser();
 document.getElementById('sidebar-avatar').src = user.avatar;
 document.getElementById('sidebar-name').textContent = user.name;
 const UPLOAD_API_URL = window.BUSCA_AGIL_UPLOAD_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/upload' : '/upload');
+const ADD_LINK_API_URL = window.BUSCA_AGIL_ADD_LINK_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/add-link' : '/add-link');
 
 // ── Sidebar Toggle ──
 document.getElementById('sidebar-toggle').addEventListener('click', () => {
@@ -175,7 +176,7 @@ async function startUploads() {
       const savedFile = response.files && response.files[0] ? response.files[0] : null;
       if (savedFile) {
         MOCK_FILES.unshift({
-          id: savedFile.file_id || `f_${Date.now()}`,
+          id: savedFile.saved_name || `f_${Date.now()}`,
           name: savedFile.original_name || item.file.name,
           type: detectFileType(item.file),
           size: item.file.size,
@@ -218,6 +219,52 @@ function resetUpload() {
   document.getElementById('drop-zone').classList.remove('hidden');
   document.getElementById('state-done').classList.add('hidden');
   renderQueue();
+}
+
+// ── Add Link ──
+async function addLink() {
+  const input = document.getElementById('link-input');
+  const btn = document.getElementById('add-link-btn');
+  const url = input.value.trim();
+  if (!url) {
+    showToast('Digite uma URL válida.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(ADD_LINK_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || `Falha ao cadastrar o link (${res.status}).`);
+    }
+
+    const f = data.file;
+    MOCK_FILES.unshift({
+      id: f.id,
+      name: f.name,
+      type: f.type,
+      size: f.size,
+      createdAt: f.created_at,
+      updatedAt: f.created_at,
+      previewUrl: null,
+      driveUrl: f.url,
+      starred: false,
+      tags: f.tags || [],
+      category: f.category || null,
+      description: f.description || '',
+    });
+
+    input.value = '';
+    showToast(`Link "${f.name}" cadastrado com sucesso.`, 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro ao cadastrar o link. Tente novamente.', 'error');
+  }
+  btn.disabled = false;
 }
 
 // ── Toast ──

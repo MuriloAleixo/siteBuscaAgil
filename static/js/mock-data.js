@@ -80,7 +80,8 @@ const UPLOADED_FILES_API_URL =
 
 async function loadUploadedFiles() {
   try {
-    const res = await fetch(UPLOADED_FILES_API_URL);
+    const bustCache = UPLOADED_FILES_API_URL + (UPLOADED_FILES_API_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
+    const res = await fetch(bustCache, { cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
     const uploaded = (data.files || []).map((f) => {

@@ -105,6 +105,24 @@
           </div>
         </div>
 
+        <!-- Add Link -->
+        <div class="mt-6 p-4 rounded-2xl" style="background:var(--bg-card);border:1px solid var(--border)">
+          <p class="text-sm font-bold text-white mb-3" style="font-family:'Space Grotesk',sans-serif">Ou cadastre um link</p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input
+              type="url"
+              id="link-input"
+              placeholder="https://exemplo.com/pagina"
+              autocomplete="off"
+              class="flex-1 text-sm"
+              style="background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text-1)"
+            />
+            <button id="add-link-btn" class="btn btn-outline" onclick="addLink()">
+              <i data-lucide="link" class="w-4 h-4"></i> Adicionar link
+            </button>
+          </div>
+        </div>
+
         <!-- File Queue List -->
         <div id="file-queue" class="mt-6 flex flex-col gap-3"></div>
 

@@ -28,11 +28,12 @@ const params = new URLSearchParams(window.location.search);
 const fileId = params.get('id');
 let currentFile = null;
 
-setTimeout(() => {
+(async function initFileView() {
   if (!fileId) {
     showNotFound();
     return;
   }
+  await loadUploadedFiles();
   const file = getFileById(fileId);
   if (!file) {
     showNotFound();
@@ -40,7 +41,7 @@ setTimeout(() => {
   }
   currentFile = file;
   renderFileView(file);
-}, 300);
+})();
 
 function showNotFound() {
   document.getElementById('skeleton-view').classList.add('hidden');

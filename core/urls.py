@@ -15,6 +15,8 @@ urlpatterns = [
     path("file-view.html", views.file_view, name="file_view"),
     path("upload", views.upload_files, name="upload_api"),
     path("upload/", views.upload_files, name="upload_api_slash"),
+    path("add-link", views.add_link, name="add_link_api"),
+    path("add-link/", views.add_link, name="add_link_api_slash"),
     path("files", views.list_uploaded_files, name="uploaded_files_api"),
     path("files/", views.list_uploaded_files, name="uploaded_files_api_slash"),
 ]

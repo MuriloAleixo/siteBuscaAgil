@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
@@ -30,7 +32,14 @@ def _read_uploaded_files_json() -> list[dict]:
     if not UPLOADED_FILES_JSON_PATH.exists():
         return []
     with open(UPLOADED_FILES_JSON_PATH, "r", encoding="utf-8") as f:
-        return json.load(f).get("files", [])
+        raw = f.read().strip()
+    if not raw:
+        return []
+    try:
+        return json.loads(raw).get("files", [])
+    except json.JSONDecodeError as exc:
+        logger.warning("data/uploaded_files.json inválido, tratando como vazio: %s", exc)
+        return []
 
 
 def _write_uploaded_files_json(files: list[dict]) -> None:
@@ -44,7 +53,7 @@ def _write_uploaded_files_json(files: list[dict]) -> None:
 EXTENSION_TYPE_MAP = {
     ".png": "image", ".jpg": "image", ".jpeg": "image", ".gif": "image", ".webp": "image", ".svg": "image",
     ".pdf": "pdf",
-    ".mp4": "video", ".mov": "video", ".avi": "video", ".mkv": "video", ".webm": "video",
+    ".mp4": "video", ".mov": "video", ".avi": "video", ".mkv": "video", ".webm": "video", ".wmv": "video",
     ".mp3": "audio", ".wav": "audio", ".ogg": "audio", ".m4a": "audio",
     ".xlsx": "sheet", ".xls": "sheet", ".csv": "sheet",
     ".doc": "doc", ".docx": "doc", ".txt": "doc",
@@ -185,7 +194,63 @@ def _classify_and_catalog(saved_path: str, public_url: str) -> dict | None:
     return resultado
 
 
+def _classify_and_catalog_link(url: str) -> dict | None:
+    """Mesma ideia de _classify_and_catalog, mas para um link (URL) em vez de
+    um arquivo salvo em disco. Também best-effort."""
+    try:
+        return processar_upload(url, catalog_path=CATALOG_PATH)
+    except Exception as exc:  # noqa: BLE001 - classificação é best-effort
+        logger.warning("Não foi possível classificar o link '%s': %s", url, exc)
+        return None
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def add_link(request):
+    """Cadastra um link (URL) no mesmo catálogo dos arquivos, com type='link'."""
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = request.POST
+
+    url = (payload.get("url") or "").strip()
+    name = (payload.get("name") or "").strip()
+
+    if not url:
+        return JsonResponse({"success": False, "error": "Informe uma URL."}, status=400)
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return JsonResponse({"success": False, "error": "URL inválida. Use http:// ou https://"}, status=400)
+
+    if not name:
+        name = (parsed.netloc + parsed.path).rstrip("/")
+
+    classification = _classify_and_catalog_link(url)
+
+    entry = {
+        "id": f"link_{uuid.uuid4().hex[:8]}",
+        "name": name,
+        "type": "link",
+        "content_type": "text/url",
+        "size": 0,
+        "created_at": datetime.now(tz=timezone.utc).isoformat(),
+        "url": url,
+        "category": classification.get("categoria_principal") if classification else None,
+        "tags": classification.get("tags", []) if classification else [],
+        "description": classification.get("descricao", "") if classification else "",
+    }
+
+    registered_files = _read_uploaded_files_json()
+    registered_files.insert(0, entry)
+    _write_uploaded_files_json(registered_files)
+
+    return JsonResponse({"success": True, "file": entry})
+
+
 @require_http_methods(["GET"])
 def list_uploaded_files(request):
     """Fonte única de verdade: lê data/uploaded_files.json (sem varrer o disco)."""
-    return JsonResponse({"success": True, "files": _read_uploaded_files_json()})
+    response = JsonResponse({"success": True, "files": _read_uploaded_files_json()})
+    response["Cache-Control"] = "no-store"
+    return response
