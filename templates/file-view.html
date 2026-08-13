@@ -153,11 +153,54 @@
               </div>
             </div>
 
-            <!-- Tags -->
+            <!-- Classificação -->
             <div class="glass-2 rounded-2xl p-6 border" style="border-color:var(--border-2)">
-              <h2 class="text-base font-bold text-white mb-3" style="font-family:'Space Grotesk',sans-serif">Palavras-chave & Tags</h2>
-              <div id="file-tags" class="flex flex-wrap gap-2"></div>
-              <p id="no-tags" class="text-xs hidden" style="color:var(--text-3)">Nenhuma tag cadastrada</p>
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Classificação</h2>
+                <button class="btn btn-ghost btn-sm" id="edit-classification-btn" onclick="toggleClassificationEdit()">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- View mode -->
+              <div id="classification-view">
+                <p id="classification-warning" class="hidden text-xs mb-3 px-3 py-2 rounded-lg flex items-center gap-2" style="background:rgba(234,179,8,0.12);color:#eab308">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                  <span>Não foi possível classificar este arquivo automaticamente. Classifique manualmente.</span>
+                </p>
+                <div class="mb-3">
+                  <span class="text-xs block mb-1" style="color:var(--text-3)">Categoria</span>
+                  <span id="classification-category"></span>
+                </div>
+                <div>
+                  <span class="text-xs block mb-1" style="color:var(--text-3)">Tags</span>
+                  <div id="file-tags" class="flex flex-wrap gap-2"></div>
+                  <p id="no-tags" class="text-xs hidden" style="color:var(--text-3)">Nenhuma tag cadastrada</p>
+                </div>
+              </div>
+
+              <!-- Edit mode -->
+              <div id="classification-form" class="hidden flex flex-col gap-3">
+                <div>
+                  <label class="text-xs block mb-1" style="color:var(--text-3)">Categoria</label>
+                  <input id="edit-category-input" type="text" placeholder="ex: financeiro" autocomplete="off"
+                    style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-1);font-size:13px" />
+                </div>
+                <div>
+                  <label class="text-xs block mb-1" style="color:var(--text-3)">Tags (separadas por vírgula)</label>
+                  <input id="edit-tags-input" type="text" placeholder="ex: contrato, imóvel, 2026" autocomplete="off"
+                    style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-1);font-size:13px" />
+                </div>
+                <div>
+                  <label class="text-xs block mb-1" style="color:var(--text-3)">Descrição</label>
+                  <textarea id="edit-description-input" rows="3" placeholder="Resumo objetivo do conteúdo"
+                    style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-1);font-size:13px;resize:vertical"></textarea>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-violet btn-sm flex-1" id="save-classification-btn" onclick="saveClassification()">Salvar</button>
+                  <button class="btn btn-outline btn-sm" onclick="toggleClassificationEdit(false)">Cancelar</button>
+                </div>
+              </div>
             </div>
           </div>
 

@@ -1,6 +1,24 @@
 {
   "files": [
     {
+      "id": "link_1801b52b",
+      "name": "roqueimoveis.com.br",
+      "type": "link",
+      "content_type": "text/url",
+      "size": 0,
+      "created_at": "2026-08-13T13:22:16.450042+00:00",
+      "url": "https://roqueimoveis.com.br/",
+      "category": "outros",
+      "tags": [
+        "roque imóveis",
+        "limeira",
+        "aluguel",
+        "venda",
+        "imobiliária"
+      ],
+      "description": "Página inicial do site da Roque Imóveis, oferecendo opções de aluguel, compra, lançamentos de imóveis e serviços de manutenção em Limeira."
+    },
+    {
       "id": "teste.txt",
       "name": "teste.txt",
       "type": "doc",

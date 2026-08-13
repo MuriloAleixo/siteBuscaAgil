@@ -19,4 +19,5 @@ urlpatterns = [
     path("add-link/", views.add_link, name="add_link_api_slash"),
     path("files", views.list_uploaded_files, name="uploaded_files_api"),
     path("files/", views.list_uploaded_files, name="uploaded_files_api_slash"),
+    path("files/<str:file_id>/update", views.update_file_metadata, name="update_file_metadata_api"),
 ]

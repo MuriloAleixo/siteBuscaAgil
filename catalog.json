@@ -51,6 +51,34 @@
           "outros": 0.9
         }
       }
+    },
+    "f_220b9410": {
+      "filename": "https://roqueimoveis.com.br/",
+      "cloud_path": null,
+      "extension": ".br",
+      "size_bytes": null,
+      "category": "outros",
+      "tags": [
+        "roque imóveis",
+        "limeira",
+        "aluguel",
+        "venda",
+        "imobiliária"
+      ],
+      "description": "Página inicial do site da Roque Imóveis, oferecendo opções de aluguel, compra, lançamentos de imóveis e serviços de manutenção em Limeira.",
+      "uploaded_at": "2026-08-13T13:22:16.449128+00:00",
+      "extra_metadata": {
+        "classificacao_scores": {
+          "financeiro": 0.0,
+          "juridico": 0.0,
+          "recursos humanos": 0.0,
+          "contrato": 0.0,
+          "nota fiscal": 0.0,
+          "relatorio tecnico": 0.0,
+          "marketing": 0.4,
+          "outros": 0.9
+        }
+      }
     }
   },
   "tags_index": {
@@ -71,12 +99,28 @@
     ],
     "tecnologia da informação": [
       "f_2bbc4b86"
+    ],
+    "roque imóveis": [
+      "f_220b9410"
+    ],
+    "limeira": [
+      "f_220b9410"
+    ],
+    "aluguel": [
+      "f_220b9410"
+    ],
+    "venda": [
+      "f_220b9410"
+    ],
+    "imobiliária": [
+      "f_220b9410"
     ]
   },
   "category_index": {
     "outros": [
       "f_4a00e266",
-      "f_2bbc4b86"
+      "f_2bbc4b86",
+      "f_220b9410"
     ]
   }
 }

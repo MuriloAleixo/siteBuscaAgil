@@ -4,7 +4,8 @@
       "Bash(python -c \"import py_compile; py_compile.compile\\('busca_agil/settings.py', doraise=True\\); print\\('OK'\\)\")",
       "WebSearch",
       "WebFetch(domain:ai.google.dev)",
-      "Bash(python -c \"import py_compile; py_compile.compile\\('scripts/categorizer_gemini.py', doraise=True\\); print\\('OK'\\)\")"
+      "Bash(python -c \"import py_compile; py_compile.compile\\('scripts/categorizer_gemini.py', doraise=True\\); print\\('OK'\\)\")",
+      "Bash(python -c \"import py_compile; py_compile.compile\\('core/views.py', doraise=True\\); py_compile.compile\\('core/urls.py', doraise=True\\); print\\('OK'\\)\")"
     ]
   }
 }

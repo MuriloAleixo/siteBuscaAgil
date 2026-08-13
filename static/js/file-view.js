@@ -75,8 +75,8 @@ function renderFileView(file) {
   // Metadata
   renderMeta(file, typeInfo);
 
-  // Tags
-  renderTags(file);
+  // Classificação (categoria + tags, com fallback manual)
+  renderClassification(file);
 
   lucide.createIcons();
 }
@@ -171,6 +171,7 @@ function renderTags(file) {
   const container = document.getElementById('file-tags');
   const noTags = document.getElementById('no-tags');
   if (!file.tags || file.tags.length === 0) {
+    container.innerHTML = '';
     noTags.classList.remove('hidden');
     return;
   }
@@ -181,6 +182,77 @@ function renderTags(file) {
        #${tag}
      </span>`
   ).join('');
+}
+
+// ── Classificação: exibição + fallback manual quando o Gemini não classifica ──
+function renderClassification(file) {
+  const warning = document.getElementById('classification-warning');
+  const categoryEl = document.getElementById('classification-category');
+  const hasCategory = !!file.category;
+
+  warning.classList.toggle('hidden', hasCategory);
+  categoryEl.innerHTML = hasCategory
+    ? `<span class="type-pill" style="background:var(--bg-card);color:var(--text-2);border:1px solid var(--border)">${file.category}</span>`
+    : `<span class="text-xs" style="color:var(--text-3)">Não classificado</span>`;
+
+  renderTags(file);
+
+  document.getElementById('edit-category-input').value = file.category || '';
+  document.getElementById('edit-tags-input').value = (file.tags || []).join(', ');
+  document.getElementById('edit-description-input').value = file.description || '';
+}
+
+function toggleClassificationEdit(show) {
+  const view = document.getElementById('classification-view');
+  const form = document.getElementById('classification-form');
+  const shouldShow = show === undefined ? form.classList.contains('hidden') : show;
+  view.classList.toggle('hidden', shouldShow);
+  form.classList.toggle('hidden', !shouldShow);
+  lucide.createIcons();
+}
+
+async function saveClassification() {
+  if (!currentFile) return;
+  const btn = document.getElementById('save-classification-btn');
+  const category = document.getElementById('edit-category-input').value.trim();
+  const tags = document.getElementById('edit-tags-input').value
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const description = document.getElementById('edit-description-input').value.trim();
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${UPLOADED_FILES_API_URL}/${encodeURIComponent(currentFile.id)}/update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category, tags, description }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || `Falha ao salvar (${res.status}).`);
+    }
+
+    const f = data.file;
+    currentFile.category = f.category || null;
+    currentFile.tags = f.tags || [];
+    currentFile.description = f.description || '';
+
+    const idx = MOCK_FILES.findIndex((x) => x.id === currentFile.id);
+    if (idx !== -1) {
+      MOCK_FILES[idx].category = currentFile.category;
+      MOCK_FILES[idx].tags = currentFile.tags;
+      MOCK_FILES[idx].description = currentFile.description;
+    }
+
+    renderClassification(currentFile);
+    renderDescription(currentFile);
+    toggleClassificationEdit(false);
+    showToast('Classificação salva com sucesso!', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro ao salvar a classificação.', 'error');
+  }
+  btn.disabled = false;
 }
 
 // Star toggle

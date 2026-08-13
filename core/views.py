@@ -248,6 +248,39 @@ def add_link(request):
     return JsonResponse({"success": True, "file": entry})
 
 
+@csrf_exempt
+@require_http_methods(["POST"])
+def update_file_metadata(request, file_id: str):
+    """Permite classificar/taguear manualmente um arquivo quando a
+    classificação automática via Gemini não estiver disponível ou tiver
+    falhado (sem GEMINI_API_KEY, formato não suportado, erro de rede etc.)."""
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "JSON inválido."}, status=400)
+
+    registered_files = _read_uploaded_files_json()
+    entry = next((f for f in registered_files if f["id"] == file_id), None)
+    if entry is None:
+        return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
+
+    if "category" in payload:
+        category = (payload.get("category") or "").strip().lower()
+        entry["category"] = category or None
+
+    if "tags" in payload:
+        tags = payload.get("tags")
+        if not isinstance(tags, list):
+            return JsonResponse({"success": False, "error": "'tags' deve ser uma lista."}, status=400)
+        entry["tags"] = [t.strip().lower() for t in tags if isinstance(t, str) and t.strip()]
+
+    if "description" in payload:
+        entry["description"] = (payload.get("description") or "").strip()
+
+    _write_uploaded_files_json(registered_files)
+    return JsonResponse({"success": True, "file": entry})
+
+
 @require_http_methods(["GET"])
 def list_uploaded_files(request):
     """Fonte única de verdade: lê data/uploaded_files.json (sem varrer o disco)."""
