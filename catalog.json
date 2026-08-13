@@ -1,0 +1,82 @@
+{
+  "files": {
+    "f_4a00e266": {
+      "filename": "teste.txt",
+      "cloud_path": "/media/teste.txt",
+      "extension": ".txt",
+      "size_bytes": null,
+      "category": "outros",
+      "tags": [
+        "outros"
+      ],
+      "description": "Guia de conscientização sobre cibersegurança e boas práticas para colaboradores, destacando que a segurança da informação é uma responsabilidade coletiva.",
+      "uploaded_at": "2026-08-13T13:10:52.681291+00:00",
+      "extra_metadata": {
+        "classificacao_scores": {
+          "financeiro": 0.0,
+          "juridico": 0.0,
+          "recursos humanos": 0.3,
+          "contrato": 0.0,
+          "nota fiscal": 0.0,
+          "relatorio tecnico": 0.2,
+          "marketing": 0.0,
+          "outros": 0.9
+        }
+      }
+    },
+    "f_2bbc4b86": {
+      "filename": "teste.txt",
+      "cloud_path": "/media/teste.txt",
+      "extension": ".txt",
+      "size_bytes": null,
+      "category": "outros",
+      "tags": [
+        "cibersegurança",
+        "senhas",
+        "autenticação",
+        "golpes",
+        "tecnologia da informação"
+      ],
+      "description": "Artigo educativo sobre a importância da cibersegurança nas empresas, destacando que a proteção contra golpes, roubo de senhas e invasões é responsabilidade de todos os colaboradores e não apenas do setor de TI.",
+      "uploaded_at": "2026-08-13T13:13:21.352831+00:00",
+      "extra_metadata": {
+        "classificacao_scores": {
+          "financeiro": 0.0,
+          "juridico": 0.0,
+          "recursos humanos": 0.1,
+          "contrato": 0.0,
+          "nota fiscal": 0.0,
+          "relatorio tecnico": 0.2,
+          "marketing": 0.0,
+          "outros": 0.9
+        }
+      }
+    }
+  },
+  "tags_index": {
+    "outros": [
+      "f_4a00e266"
+    ],
+    "cibersegurança": [
+      "f_2bbc4b86"
+    ],
+    "senhas": [
+      "f_2bbc4b86"
+    ],
+    "autenticação": [
+      "f_2bbc4b86"
+    ],
+    "golpes": [
+      "f_2bbc4b86"
+    ],
+    "tecnologia da informação": [
+      "f_2bbc4b86"
+    ]
+  },
+  "category_index": {
+    "outros": [
+      "f_4a00e266",
+      "f_2bbc4b86"
+    ]
+  }
+}

@@ -69,6 +69,9 @@ function renderFileView(file) {
   // Preview
   renderPreview(file, typeInfo);
 
+  // Description
+  renderDescription(file);
+
   // Metadata
   renderMeta(file, typeInfo);
 
@@ -136,6 +139,16 @@ function renderIconPreview(typeInfo, subtitle) {
       </div>
       <p class="text-xs text-center" style="color:var(--text-3)">${subtitle}</p>
     </div>`;
+}
+
+function renderDescription(file) {
+  const box = document.getElementById('description-box');
+  if (!file.description) {
+    box.classList.add('hidden');
+    return;
+  }
+  document.getElementById('description-text').textContent = file.description;
+  box.classList.remove('hidden');
 }
 
 function renderMeta(file, typeInfo) {

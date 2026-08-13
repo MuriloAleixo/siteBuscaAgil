@@ -1,16 +1,22 @@
 {
   "files": [
     {
-      "id": "teste_3W7Ty89.txt",
+      "id": "teste.txt",
       "name": "teste.txt",
       "type": "doc",
       "content_type": "text/plain",
       "size": 3654,
-      "created_at": "2026-08-12T17:01:24.252187+00:00",
-      "url": "/media/teste_3W7Ty89.txt",
-      "category": null,
-      "tags": [],
-      "description": ""
+      "created_at": "2026-08-13T13:13:21.354181+00:00",
+      "url": "/media/teste.txt",
+      "category": "outros",
+      "tags": [
+        "cibersegurança",
+        "senhas",
+        "autenticação",
+        "golpes",
+        "tecnologia da informação"
+      ],
+      "description": "Artigo educativo sobre a importância da cibersegurança nas empresas, destacando que a proteção contra golpes, roubo de senhas e invasões é responsabilidade de todos os colaboradores e não apenas do setor de TI."
     }
   ]
 }
