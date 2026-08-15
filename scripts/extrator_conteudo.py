@@ -8,7 +8,7 @@ Duas saídas possíveis:
   - {"tipo": "arquivo", "caminho": "...", "mime_type": "..."} -> vai como
     parte binária nativa (imagem/PDF), o Gemini processa diretamente
 
-Formatos cobertos: txt, csv, xlsx, xls, doc, docx, jpg, jpeg, png, e links (http/https).
+Formatos cobertos: txt, py, csv, xlsx, xls, doc, docx, jpg, jpeg, png, pdf, e links (http/https).
 """
 
 from pathlib import Path
@@ -126,6 +126,7 @@ def preparar_conteudo(origem: str) -> dict:
 
     extratores_texto = {
         ".txt": _extrair_txt,
+        ".py": _extrair_txt,
         ".csv": _extrair_csv,
         ".xlsx": _extrair_xlsx_xls,
         ".xls": _extrair_xlsx_xls,

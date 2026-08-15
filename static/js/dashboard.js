@@ -68,7 +68,9 @@ const mainSearchInput = document.getElementById('main-search-input');
 let searchTimer;
 mainSearchInput.addEventListener('input', () => {
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(renderFiles, 150);
+  // Maior que o filtro local puro porque cada busca com texto dispara uma
+  // chamada ao backend (análise via Gemini).
+  searchTimer = setTimeout(renderFiles, 400);
 });
 
 // Sort Handler
@@ -92,9 +94,15 @@ function highlightQuery(text, query) {
 }
 
 // Main Render Function
-function renderFiles() {
+let renderFilesRequestId = 0;
+
+async function renderFiles() {
   const query = mainSearchInput.value.trim();
-  let files = searchFiles(query, currentType);
+
+  const requestId = ++renderFilesRequestId;
+  let files = await smartSearchFiles(query, currentType);
+  if (requestId !== renderFilesRequestId) return; // resposta obsoleta, ignora
+
   files = getSortedFiles(files);
 
   const container = document.getElementById('files-container');

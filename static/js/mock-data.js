@@ -78,30 +78,36 @@ const UPLOADED_FILES_API_URL =
   window.BUSCA_AGIL_FILES_URL ||
   (window.location.protocol === "file:" ? "http://localhost:8000/files" : "/files");
 
+const SMART_SEARCH_API_URL =
+  window.BUSCA_AGIL_SEARCH_URL ||
+  (window.location.protocol === "file:" ? "http://localhost:8000/search-query" : "/search-query");
+
+function mapUploadedFileToCard(f) {
+  const tags = [...(f.tags || [])];
+  if (f.category && !tags.includes(f.category)) tags.push(f.category);
+  return {
+    id: f.id,
+    name: f.name,
+    type: f.type,
+    size: f.size,
+    createdAt: f.created_at,
+    updatedAt: f.created_at,
+    previewUrl: f.type === "image" ? f.url : null,
+    driveUrl: f.url,
+    starred: false,
+    tags,
+    category: f.category || null,
+    description: f.description || "",
+  };
+}
+
 async function loadUploadedFiles() {
   try {
     const bustCache = UPLOADED_FILES_API_URL + (UPLOADED_FILES_API_URL.includes("?") ? "&" : "?") + "_=" + Date.now();
     const res = await fetch(bustCache, { cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
-    const uploaded = (data.files || []).map((f) => {
-      const tags = [...(f.tags || [])];
-      if (f.category && !tags.includes(f.category)) tags.push(f.category);
-      return {
-        id: f.id,
-        name: f.name,
-        type: f.type,
-        size: f.size,
-        createdAt: f.created_at,
-        updatedAt: f.created_at,
-        previewUrl: f.type === "image" ? f.url : null,
-        driveUrl: f.url,
-        starred: false,
-        tags,
-        category: f.category || null,
-        description: f.description || "",
-      };
-    });
+    const uploaded = (data.files || []).map(mapUploadedFileToCard);
 
     uploaded.forEach((file) => {
       const idx = MOCK_FILES.findIndex((existing) => existing.id === file.id);
@@ -113,6 +119,34 @@ async function loadUploadedFiles() {
   } catch (e) {
     console.warn("Não foi possível carregar os arquivos enviados:", e);
     return [];
+  }
+}
+
+// Busca assistida por IA: envia a consulta para o backend, que pede ao
+// Gemini as categorias/tags mais prováveis e filtra data/uploaded_files.json
+// por elas (com fallback local em caso de falha/latência).
+async function smartSearchFiles(query, filterType = "all") {
+  const q = (query || "").trim();
+
+  if (!q) {
+    return searchFiles(query, filterType);
+  }
+
+  try {
+    const url = `${SMART_SEARCH_API_URL}?q=${encodeURIComponent(q)}`;
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || "busca falhou");
+
+    let results = (data.files || []).map(mapUploadedFileToCard);
+    if (filterType && filterType !== "all") {
+      results = results.filter((f) => f.type === filterType);
+    }
+    return results;
+  } catch (e) {
+    console.warn("Busca assistida por IA indisponível, usando busca local:", e);
+    return searchFiles(query, filterType);
   }
 }
 

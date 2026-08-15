@@ -79,6 +79,91 @@
           "outros": 0.9
         }
       }
+    },
+    "f_0acc8f8e": {
+      "filename": "Evandro_Supersi_eWXcNEq.docx",
+      "cloud_path": "/media/Evandro_Supersi_eWXcNEq.docx",
+      "extension": ".docx",
+      "size_bytes": null,
+      "category": "recursos humanos",
+      "tags": [
+        "evandro aparecido supersi",
+        "ciências contábeis",
+        "auxiliar administrativo",
+        "limeira",
+        "currículo"
+      ],
+      "description": "Currículo profissional de Evandro Aparecido Supersi detalhando sua formação em ciências contábeis e experiências como auxiliar administrativo em empresas como Roque Imóvel e Fieel Citrus.",
+      "uploaded_at": "2026-08-15T02:42:10.644350+00:00",
+      "extra_metadata": {
+        "classificacao_scores": {
+          "financeiro": 0.3,
+          "juridico": 0.1,
+          "recursos humanos": 0.9,
+          "contrato": 0.1,
+          "nota fiscal": 0.1,
+          "relatorio tecnico": 0.0,
+          "marketing": 0.0,
+          "outros": 0.2
+        }
+      }
+    },
+    "f_28a264ed": {
+      "filename": "gerar_cnab240_aWskTDu.py",
+      "cloud_path": "/media/gerar_cnab240_aWskTDu.py",
+      "extension": ".py",
+      "size_bytes": null,
+      "category": "financeiro",
+      "tags": [
+        "cnab 240",
+        "febraban",
+        "pandas",
+        "remessa",
+        "pagamento"
+      ],
+      "description": "Script em Python para geração de arquivo de remessa CNAB 240 (versão 8.0) da FEBRABAN a partir de dados de um arquivo Excel e configurações em JSON.",
+      "uploaded_at": "2026-08-15T02:42:43.915132+00:00",
+      "extra_metadata": {
+        "classificacao_scores": {
+          "financeiro": 0.95,
+          "juridico": 0.0,
+          "recursos humanos": 0.1,
+          "contrato": 0.0,
+          "nota fiscal": 0.1,
+          "relatorio tecnico": 0.3,
+          "marketing": 0.0,
+          "outros": 0.1
+        }
+      }
+    },
+    "f_a3b6996a": {
+      "filename": "WhatsApp Image 2026-02-16 at 21.38.36.jpeg",
+      "cloud_path": "/media/WhatsApp%20Image%202026-02-16%20at%2021.38.36.jpeg",
+      "extension": ".jpeg",
+      "size_bytes": null,
+      "category": "outros",
+      "tags": [
+        "mercado de trabalho",
+        "area de atuacao",
+        "estudos",
+        "mapas mentais",
+        "resumos",
+        "disciplinas"
+      ],
+      "description": "O texto manuscrito aborda expectativas profissionais relacionadas ao direcionamento para o mercado de trabalho e o aprimoramento dos estudos por meio de mapas mentais e resumos.",
+      "uploaded_at": "2026-08-15T02:43:31.752268+00:00",
+      "extra_metadata": {
+        "classificacao_scores": {
+          "financeiro": 0.0,
+          "juridico": 0.0,
+          "recursos humanos": 0.1,
+          "contrato": 0.0,
+          "nota fiscal": 0.0,
+          "relatorio tecnico": 0.0,
+          "marketing": 0.0,
+          "outros": 0.9
+        }
+      }
     }
   },
   "tags_index": {
@@ -104,7 +189,8 @@
       "f_220b9410"
     ],
     "limeira": [
-      "f_220b9410"
+      "f_220b9410",
+      "f_0acc8f8e"
     ],
     "aluguel": [
       "f_220b9410"
@@ -114,13 +200,65 @@
     ],
     "imobiliária": [
       "f_220b9410"
+    ],
+    "evandro aparecido supersi": [
+      "f_0acc8f8e"
+    ],
+    "ciências contábeis": [
+      "f_0acc8f8e"
+    ],
+    "auxiliar administrativo": [
+      "f_0acc8f8e"
+    ],
+    "currículo": [
+      "f_0acc8f8e"
+    ],
+    "cnab 240": [
+      "f_28a264ed"
+    ],
+    "febraban": [
+      "f_28a264ed"
+    ],
+    "pandas": [
+      "f_28a264ed"
+    ],
+    "remessa": [
+      "f_28a264ed"
+    ],
+    "pagamento": [
+      "f_28a264ed"
+    ],
+    "mercado de trabalho": [
+      "f_a3b6996a"
+    ],
+    "area de atuacao": [
+      "f_a3b6996a"
+    ],
+    "estudos": [
+      "f_a3b6996a"
+    ],
+    "mapas mentais": [
+      "f_a3b6996a"
+    ],
+    "resumos": [
+      "f_a3b6996a"
+    ],
+    "disciplinas": [
+      "f_a3b6996a"
     ]
   },
   "category_index": {
     "outros": [
       "f_4a00e266",
       "f_2bbc4b86",
-      "f_220b9410"
+      "f_220b9410",
+      "f_a3b6996a"
+    ],
+    "recursos humanos": [
+      "f_0acc8f8e"
+    ],
+    "financeiro": [
+      "f_28a264ed"
     ]
   }
 }

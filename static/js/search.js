@@ -31,13 +31,14 @@ const emptyState = document.getElementById('search-empty');
 const emptyText = document.getElementById('search-empty-text');
 const resultsInfo = document.getElementById('search-results-info');
 
-// Debounce search
+// Debounce search — maior que o filtro local puro porque cada busca com
+// texto dispara uma chamada ao backend (análise via Gemini).
 let timer;
 searchInput.addEventListener('input', () => {
   clearTimeout(timer);
   const q = searchInput.value.trim();
   clearBtn.classList.toggle('hidden', q.length === 0);
-  timer = setTimeout(runSearch, 150);
+  timer = setTimeout(runSearch, 400);
 });
 
 function clearSearchInput() {
@@ -55,10 +56,23 @@ function setSearchFilter(type) {
   runSearch();
 }
 
-function runSearch() {
-  const query = searchInput.value.trim();
-  let files = searchFiles(query, currentFilter);
+let searchRequestId = 0;
 
+async function runSearch() {
+  const query = searchInput.value.trim();
+
+  if (query) {
+    resultsInfo.textContent = `Analisando "${query}"...`;
+  }
+
+  const requestId = ++searchRequestId;
+  const files = await smartSearchFiles(query, currentFilter);
+  if (requestId !== searchRequestId) return; // resposta obsoleta, ignora
+
+  renderSearchResults(files, query);
+}
+
+function renderSearchResults(files, query) {
   // Sort
   const sortVal = document.getElementById('search-sort').value;
   files.sort((a, b) => {

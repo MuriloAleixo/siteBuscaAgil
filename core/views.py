@@ -15,8 +15,9 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from scripts.analisador_busca import BuscaAnalyzer
 from scripts.file_catalog import FileCatalog
-from scripts.processar_upload import processar_upload
+from scripts.processar_upload import CATEGORIAS_POSSIVEIS, processar_upload
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,7 @@ EXTENSION_TYPE_MAP = {
     ".mp4": "video", ".mov": "video", ".avi": "video", ".mkv": "video", ".webm": "video", ".wmv": "video",
     ".mp3": "audio", ".wav": "audio", ".ogg": "audio", ".m4a": "audio",
     ".xlsx": "sheet", ".xls": "sheet", ".csv": "sheet",
-    ".doc": "doc", ".docx": "doc", ".txt": "doc",
+    ".doc": "doc", ".docx": "doc", ".txt": "doc", ".py": "doc",
     ".zip": "archive", ".rar": "archive", ".tar": "archive", ".gz": "archive", ".7z": "archive",
 }
 
@@ -285,5 +286,60 @@ def update_file_metadata(request, file_id: str):
 def list_uploaded_files(request):
     """Fonte única de verdade: lê data/uploaded_files.json (sem varrer o disco)."""
     response = JsonResponse({"success": True, "files": _read_uploaded_files_json()})
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+def _file_matches(entry: dict, categories: list[str], tags: list[str], query_lower: str) -> bool:
+    file_category = (entry.get("category") or "").lower()
+    file_tags = [t.lower() for t in (entry.get("tags") or [])]
+
+    if categories and file_category in categories:
+        return True
+    if tags and any(t in file_tags for t in tags):
+        return True
+
+    # Fallback: substring simples no nome/descrição/categoria/tags. Garante
+    # que a busca nunca fica pior que a antiga por causa de falha/ausência
+    # da análise via Gemini (sem GEMINI_API_KEY, erro de rede etc.).
+    haystack = " ".join(
+        [entry.get("name", ""), entry.get("description", ""), file_category, " ".join(file_tags)]
+    ).lower()
+    return query_lower in haystack
+
+
+@require_http_methods(["GET"])
+def smart_search(request):
+    """
+    Busca assistida por IA: envia o texto do campo de busca para o Gemini,
+    que devolve as categorias/tags candidatas mais prováveis, e usa isso
+    para filtrar data/uploaded_files.json por categoria e/ou tags.
+    """
+    query = (request.GET.get("q") or "").strip()
+    all_files = _read_uploaded_files_json()
+
+    if not query:
+        response = JsonResponse({"success": True, "query": "", "categories": [], "tags": [], "files": all_files})
+        response["Cache-Control"] = "no-store"
+        return response
+
+    known_tags = sorted({tag for f in all_files for tag in (f.get("tags") or [])})
+
+    categories: list[str] = []
+    tags: list[str] = []
+    try:
+        analyzer = BuscaAnalyzer()
+        analise = analyzer.analisar(query, CATEGORIAS_POSSIVEIS, known_tags)
+        categories = [c.strip().lower() for c in analise.categorias if c.strip()]
+        tags = [t.strip().lower() for t in analise.tags if t.strip()]
+    except Exception as exc:  # noqa: BLE001 - busca assistida é best-effort
+        logger.warning("Não foi possível analisar a busca '%s' via Gemini: %s", query, exc)
+
+    query_lower = query.lower()
+    matched = [f for f in all_files if _file_matches(f, categories, tags, query_lower)]
+
+    response = JsonResponse(
+        {"success": True, "query": query, "categories": categories, "tags": tags, "files": matched}
+    )
     response["Cache-Control"] = "no-store"
     return response

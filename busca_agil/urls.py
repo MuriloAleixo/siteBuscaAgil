@@ -12,6 +12,10 @@ from core import views
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", RedirectView.as_view(url="/index.html", permanent=False)),
+    path(
+        "favicon.ico",
+        RedirectView.as_view(url=settings.STATIC_URL + "img/favicon.svg", permanent=True),
+    ),
     path("", include("core.urls")),
     path("css/<path:path>", serve, {"document_root": settings.BASE_DIR / "css"}),
     path("js/<path:path>", serve, {"document_root": settings.BASE_DIR / "js"}),
