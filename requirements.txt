@@ -11,6 +11,9 @@ xlrd==2.0.2
 python-docx==1.2.0
 requests==2.34.2
 beautifulsoup4==4.15.0
+celery==5.4.0
+redis==5.0.8
+filelock==3.16.1
 
 # Para ler arquivos .doc legados, instale tambem no sistema:
 # sudo apt-get install antiword

@@ -22,4 +22,5 @@ urlpatterns = [
     path("search-query", views.smart_search, name="smart_search_api"),
     path("search-query/", views.smart_search, name="smart_search_api_slash"),
     path("files/<str:file_id>/update", views.update_file_metadata, name="update_file_metadata_api"),
+    path("files/<str:file_id>/status", views.file_status, name="file_status_api"),
 ]

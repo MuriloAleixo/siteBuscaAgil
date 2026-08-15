@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,40 +14,15 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from core import uploaded_files_store
+from core.tasks import classify_and_catalog_task, classify_link_task
 from scripts.analisador_busca import BuscaAnalyzer
-from scripts.file_catalog import FileCatalog
-from scripts.processar_upload import CATEGORIAS_POSSIVEIS, processar_upload
+from scripts.processar_upload import CATEGORIAS_POSSIVEIS
 
 logger = logging.getLogger(__name__)
 
-CATALOG_PATH = str(Path(settings.BASE_DIR) / "catalog.json")
-
-# JSON que guarda a lista de arquivos exibida no dashboard/busca. A consulta
-# (list_uploaded_files) só lê esse arquivo — nada de varrer o disco a cada
-# request. Cada novo upload é acrescentado aqui também.
-UPLOADED_FILES_JSON_PATH = Path(settings.BASE_DIR) / "data" / "uploaded_files.json"
-
-
-def _read_uploaded_files_json() -> list[dict]:
-    if not UPLOADED_FILES_JSON_PATH.exists():
-        return []
-    with open(UPLOADED_FILES_JSON_PATH, "r", encoding="utf-8") as f:
-        raw = f.read().strip()
-    if not raw:
-        return []
-    try:
-        return json.loads(raw).get("files", [])
-    except json.JSONDecodeError as exc:
-        logger.warning("data/uploaded_files.json inválido, tratando como vazio: %s", exc)
-        return []
-
-
-def _write_uploaded_files_json(files: list[dict]) -> None:
-    UPLOADED_FILES_JSON_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = UPLOADED_FILES_JSON_PATH.with_suffix(".tmp")
-    with open(tmp_path, "w", encoding="utf-8") as f:
-        json.dump({"files": files}, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, UPLOADED_FILES_JSON_PATH)
+_read_uploaded_files_json = uploaded_files_store.read_all
+_write_uploaded_files_json = uploaded_files_store.write_all
 
 
 EXTENSION_TYPE_MAP = {
@@ -132,16 +106,17 @@ def upload_files(request):
     storage = FileSystemStorage(location=str(settings.MEDIA_ROOT), base_url=settings.MEDIA_URL)
 
     saved_files = []
-    registered_files = _read_uploaded_files_json()
     for uploaded_file in uploaded_files:
         saved_name = storage.save(uploaded_file.name, uploaded_file)
         public_url = storage.url(saved_name)
         content_type = getattr(uploaded_file, "content_type", "application/octet-stream")
-        classification = _classify_and_catalog(storage.path(saved_name), public_url)
 
-        registered_files = [f for f in registered_files if f["id"] != saved_name]
-        registered_files.insert(
-            0,
+        # A classificação via Gemini roda num worker Celery separado (fila
+        # Redis) — a request não espera por ela, a entry entra com
+        # status="processing" e é atualizada de forma assíncrona depois.
+        async_result = classify_and_catalog_task.delay(saved_name, storage.path(saved_name), public_url)
+
+        uploaded_files_store.insert_entry(
             {
                 "id": saved_name,
                 "name": uploaded_file.name,
@@ -150,10 +125,12 @@ def upload_files(request):
                 "size": uploaded_file.size,
                 "created_at": datetime.now(tz=timezone.utc).isoformat(),
                 "url": public_url,
-                "category": classification.get("categoria_principal") if classification else None,
-                "tags": classification.get("tags", []) if classification else [],
-                "description": classification.get("descricao", "") if classification else "",
-            },
+                "status": "processing",
+                "category": None,
+                "tags": [],
+                "description": "",
+                "task_id": async_result.id,
+            }
         )
 
         saved_files.append(
@@ -164,45 +141,12 @@ def upload_files(request):
                 "public_url": public_url,
                 "size_bytes": uploaded_file.size,
                 "content_type": content_type,
-                "classification": classification,
+                "status": "processing",
+                "task_id": async_result.id,
             }
         )
 
-    _write_uploaded_files_json(registered_files)
-
     return JsonResponse({"success": True, "files": saved_files})
-
-
-def _classify_and_catalog(saved_path: str, public_url: str) -> dict | None:
-    """
-    Classifica o arquivo recém-salvo com o pipeline em scripts/ (extrai
-    conteúdo, categoriza via Gemini e grava no catálogo local). É best-effort:
-    formatos não suportados ou falta de GEMINI_API_KEY não devem derrubar o
-    upload, só deixam o arquivo sem classificação.
-    """
-    try:
-        resultado = processar_upload(saved_path, catalog_path=CATALOG_PATH)
-    except Exception as exc:  # noqa: BLE001 - classificação é best-effort
-        logger.warning("Não foi possível classificar '%s': %s", saved_path, exc)
-        return None
-
-    try:
-        catalog = FileCatalog(CATALOG_PATH)
-        catalog.update_cloud_path(resultado["file_id"], public_url)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Não foi possível vincular a URL pública no catálogo: %s", exc)
-
-    return resultado
-
-
-def _classify_and_catalog_link(url: str) -> dict | None:
-    """Mesma ideia de _classify_and_catalog, mas para um link (URL) em vez de
-    um arquivo salvo em disco. Também best-effort."""
-    try:
-        return processar_upload(url, catalog_path=CATALOG_PATH)
-    except Exception as exc:  # noqa: BLE001 - classificação é best-effort
-        logger.warning("Não foi possível classificar o link '%s': %s", url, exc)
-        return None
 
 
 @csrf_exempt
@@ -227,24 +171,25 @@ def add_link(request):
     if not name:
         name = (parsed.netloc + parsed.path).rstrip("/")
 
-    classification = _classify_and_catalog_link(url)
+    entry_id = f"link_{uuid.uuid4().hex[:8]}"
+    async_result = classify_link_task.delay(entry_id, url)
 
     entry = {
-        "id": f"link_{uuid.uuid4().hex[:8]}",
+        "id": entry_id,
         "name": name,
         "type": "link",
         "content_type": "text/url",
         "size": 0,
         "created_at": datetime.now(tz=timezone.utc).isoformat(),
         "url": url,
-        "category": classification.get("categoria_principal") if classification else None,
-        "tags": classification.get("tags", []) if classification else [],
-        "description": classification.get("descricao", "") if classification else "",
+        "status": "processing",
+        "category": None,
+        "tags": [],
+        "description": "",
+        "task_id": async_result.id,
     }
 
-    registered_files = _read_uploaded_files_json()
-    registered_files.insert(0, entry)
-    _write_uploaded_files_json(registered_files)
+    uploaded_files_store.insert_entry(entry)
 
     return JsonResponse({"success": True, "file": entry})
 
@@ -286,6 +231,33 @@ def update_file_metadata(request, file_id: str):
 def list_uploaded_files(request):
     """Fonte única de verdade: lê data/uploaded_files.json (sem varrer o disco)."""
     response = JsonResponse({"success": True, "files": _read_uploaded_files_json()})
+    response["Cache-Control"] = "no-store"
+    return response
+
+
+@require_http_methods(["GET"])
+def file_status(request, file_id: str):
+    """
+    Consulta o status de classificação assíncrona de um arquivo/link
+    (status: "processing" | "done" | "error"). O front-end usa isso pra dar
+    polling depois do upload, já que a classificação via Gemini roda num
+    worker Celery separado, fora da request de upload.
+    """
+    entry = uploaded_files_store.get_entry(file_id)
+    if entry is None:
+        return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
+
+    response = JsonResponse(
+        {
+            "success": True,
+            "id": entry["id"],
+            "status": entry.get("status", "done"),
+            "category": entry.get("category"),
+            "tags": entry.get("tags", []),
+            "description": entry.get("description", ""),
+            "task_id": entry.get("task_id"),
+        }
+    )
     response["Cache-Control"] = "no-store"
     return response
 

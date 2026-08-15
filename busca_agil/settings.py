@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -73,3 +74,12 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = str(BASE_DIR / "media")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Celery: fila de mensagens (broker) e backend de resultados via Redis.
+# A classificação via Gemini roda em worker(s) separado(s) do processo web,
+# desacoplados pela fila — ver core/tasks.py.
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["json"]

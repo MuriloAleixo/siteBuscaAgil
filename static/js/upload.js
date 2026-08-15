@@ -10,6 +10,33 @@ document.getElementById('sidebar-avatar').src = user.avatar;
 document.getElementById('sidebar-name').textContent = user.name;
 const UPLOAD_API_URL = window.BUSCA_AGIL_UPLOAD_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/upload' : '/upload');
 const ADD_LINK_API_URL = window.BUSCA_AGIL_ADD_LINK_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/add-link' : '/add-link');
+const FILE_STATUS_API_URL = window.BUSCA_AGIL_FILE_STATUS_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/files' : '/files');
+
+// Faz polling em GET /files/<id>/status até a classificação assíncrona
+// (worker Celery, via fila Redis) terminar. Best-effort: se não terminar
+// dentro do timeout, o item fica com o status mostrado no upload mesmo, e o
+// usuário vê o resultado final na próxima vez que a lista for recarregada.
+function pollFileStatus(fileId, { intervalMs = 2000, timeoutMs = 40000, onUpdate } = {}) {
+  const startedAt = Date.now();
+  const tick = async () => {
+    try {
+      const res = await fetch(`${FILE_STATUS_API_URL}/${encodeURIComponent(fileId)}/status`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (data.status === 'done' || data.status === 'error') {
+          onUpdate && onUpdate(data);
+          return;
+        }
+      }
+    } catch (e) {
+      // rede instável durante o polling: apenas tenta de novo no próximo tick
+    }
+    if (Date.now() - startedAt < timeoutMs) {
+      setTimeout(tick, intervalMs);
+    }
+  };
+  setTimeout(tick, intervalMs);
+}
 
 // ── Sidebar Toggle ──
 document.getElementById('sidebar-toggle').addEventListener('click', () => {
@@ -175,8 +202,9 @@ async function startUploads() {
       });
       const savedFile = response.files && response.files[0] ? response.files[0] : null;
       if (savedFile) {
+        const fileId = savedFile.saved_name || `f_${Date.now()}`;
         MOCK_FILES.unshift({
-          id: savedFile.saved_name || `f_${Date.now()}`,
+          id: fileId,
           name: savedFile.original_name || item.file.name,
           type: detectFileType(item.file),
           size: item.file.size,
@@ -186,6 +214,21 @@ async function startUploads() {
           driveUrl: savedFile.public_url || savedFile.relative_path || '#',
           starred: false,
           tags: [],
+        });
+
+        // Classificação via IA roda assíncrona (worker Celery); avisa quando terminar.
+        pollFileStatus(fileId, {
+          onUpdate: (statusData) => {
+            const mockEntry = MOCK_FILES.find((f) => f.id === fileId);
+            if (mockEntry && statusData.status === 'done') {
+              mockEntry.tags = statusData.tags || [];
+              mockEntry.category = statusData.category || null;
+              mockEntry.description = statusData.description || '';
+              showToast(`"${item.file.name}" classificado: ${statusData.category || 'sem categoria'}.`, 'success');
+            } else if (statusData.status === 'error') {
+              showToast(`Não foi possível classificar "${item.file.name}" automaticamente.`, 'info');
+            }
+          },
         });
       }
       item.status = 'done';
@@ -257,6 +300,17 @@ async function addLink() {
       tags: f.tags || [],
       category: f.category || null,
       description: f.description || '',
+    });
+
+    pollFileStatus(f.id, {
+      onUpdate: (statusData) => {
+        const mockEntry = MOCK_FILES.find((m) => m.id === f.id);
+        if (mockEntry && statusData.status === 'done') {
+          mockEntry.tags = statusData.tags || [];
+          mockEntry.category = statusData.category || null;
+          mockEntry.description = statusData.description || '';
+        }
+      },
     });
 
     input.value = '';
