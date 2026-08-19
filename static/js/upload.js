@@ -224,15 +224,16 @@ async function startUploads() {
               mockEntry.tags = statusData.tags || [];
               mockEntry.category = statusData.category || null;
               mockEntry.description = statusData.description || '';
-              showToast(`"${item.file.name}" classificado: ${statusData.category || 'sem categoria'}.`, 'success');
+              mockEntry.driveUrl = statusData.url || mockEntry.driveUrl;
+              showToast(`"${item.file.name}" salvo no Drive e classificado: ${statusData.category || 'sem categoria'}.`, 'success');
             } else if (statusData.status === 'error') {
-              showToast(`Não foi possível classificar "${item.file.name}" automaticamente.`, 'info');
+              showToast(`Não foi possível concluir o envio de "${item.file.name}" ao Drive. Tente novamente.`, 'error');
             }
           },
         });
       }
       item.status = 'done';
-      showToast(`"${item.file.name}" salvo em media/.`, 'success');
+      showToast(`"${item.file.name}" recebido, enviando para o seu Google Drive...`, 'success');
     } catch (e) {
       item.status = 'error';
       showToast(e.message || `Erro ao enviar "${item.file.name}". Tente novamente.`, 'error');

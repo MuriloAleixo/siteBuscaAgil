@@ -17,9 +17,10 @@ document.getElementById('sidebar-avatar').src = user.avatar;
 document.getElementById('sidebar-name').textContent = user.name;
 
 function renderStorageBar() {
-  const stats = getStorageStats();
-  const storagePct = (stats.storageUsed / stats.storageTotal * 100).toFixed(1);
-  document.getElementById('storage-label').textContent = `${stats.storageUsed} GB / ${stats.storageTotal} GB`;
+  // Cota real do Google Drive do usuário (buscada no login, ver
+  // core/context_processors.py) — não usa mais o valor fixo do mock.
+  const storagePct = (user.storageUsed / user.storageTotal * 100).toFixed(1);
+  document.getElementById('storage-label').textContent = `${user.storageUsed} GB / ${user.storageTotal} GB`;
   setTimeout(() => {
     document.getElementById('storage-bar').style.width = storagePct + '%';
   }, 300);

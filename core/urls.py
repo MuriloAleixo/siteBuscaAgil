@@ -13,6 +13,7 @@ urlpatterns = [
     path("profile.html", views.profile, name="profile"),
     path("auth.html", views.auth, name="auth"),
     path("file-view.html", views.file_view, name="file_view"),
+    path("post-login/", views.post_login_sync, name="post_login_sync"),
     path("upload", views.upload_files, name="upload_api"),
     path("upload/", views.upload_files, name="upload_api_slash"),
     path("add-link", views.add_link, name="add_link_api"),

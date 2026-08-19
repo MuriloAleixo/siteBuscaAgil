@@ -79,7 +79,7 @@
           <p id="sidebar-name" class="text-xs font-bold text-white truncate" style="font-family:'Space Grotesk',sans-serif"></p>
           <p class="text-xs truncate text-cyan-400">Drive Conectado ✓</p>
         </div>
-        <button onclick="mockLogout()" class="btn btn-ghost btn-icon" title="Sair" style="padding:4px;color:var(--text-3)">
+        <button onclick="logout()" class="btn btn-ghost btn-icon" title="Sair" style="padding:4px;color:var(--text-3)">
           <i data-lucide="log-out" class="w-4 h-4"></i>
         </button>
       </div>
@@ -221,8 +221,10 @@
 
 <div class="toast-container" id="toast-container"></div>
 
-<script src="{% static 'js/mock-data.js' %}"></script>
-<script src="{% static 'js/mock-auth.js' %}"></script>
+<script>window.__BUSCA_AGIL_USER__ = {{ busca_agil_user_json|safe }};</script>
+<script src="{% static 'js/catalog-client.js' %}"></script>
+<script src="{% static 'js/file-utils.js' %}"></script>
+<script src="{% static 'js/auth.js' %}"></script>
 <script src="{% static 'js/dashboard.js' %}"></script>
 </body>
 </html>

@@ -277,13 +277,14 @@
 
   <div class="toast-container" id="toast-container"></div>
 
-  <script src="{% static 'js/mock-data.js' %}"></script>
-  <script src="{% static 'js/mock-auth.js' %}"></script>
+  <script>window.__BUSCA_AGIL_USER__ = {{ busca_agil_user_json|safe }};</script>
+  <script src="{% static 'js/catalog-client.js' %}"></script>
+  <script src="{% static 'js/auth.js' %}"></script>
   <script>
     lucide.createIcons();
 
-    // Redirect to dashboard if logged in and authorized
-    if (isLoggedIn() && isDriveAuthorized()) {
+    // Já logado (o consentimento do Google já cobre login + Drive) → direto pro painel
+    if (isLoggedIn()) {
       window.location.href = 'dashboard.html';
     }
 
@@ -294,20 +295,16 @@
       document.getElementById('login-modal').classList.remove('open');
     }
 
-    async function doLogin() {
+    // Redireciona pro fluxo real de OAuth do Google (django-allauth). O
+    // Google já pede o escopo de Drive nessa mesma tela de consentimento —
+    // não existe mais um passo separado de "autorizar o Drive" depois.
+    function doLogin() {
       const btn = document.getElementById('modal-google-btn');
       const loader = document.getElementById('login-loading');
       btn.classList.add('hidden');
       loader.classList.remove('hidden');
       loader.classList.add('flex');
-
-      try {
-        await mockLoginWithGoogle();
-        window.location.href = 'auth.html';
-      } catch(e) {
-        btn.classList.remove('hidden');
-        loader.classList.add('hidden');
-      }
+      loginWithGoogle();
     }
 
     // Hero Live Demo Search

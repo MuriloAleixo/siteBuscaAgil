@@ -1,18 +1,8 @@
 // =============================================================
-// MOCK DATA — Replace these with real API calls when backend is ready
+// MOCK DATA — o usuário já vem do backend real (ver static/js/auth.js e
+// core/context_processors.py); o que resta aqui é só o catálogo de tipos
+// de arquivo (ícones/cores) e a lista de arquivos, populada em runtime.
 // =============================================================
-
-const MOCK_USER = {
-  id: "u_001",
-  name: "Clara Oliveira",
-  email: "clara.oliveira@gmail.com",
-  avatar: "https://ui-avatars.com/api/?name=Clara+Oliveira&background=6366f1&color=fff&size=128&bold=true",
-  plan: "Pro",
-  storageUsed: 4.7,   // GB
-  storageTotal: 15,   // GB
-  joinedAt: "2024-03-15",
-  googleConnected: true,
-};
 
 const FILE_TYPES = {
   image:    { label: "Imagem",    icon: "image",        color: "#06b6d4",  bg: "rgba(6,182,212,0.12)" },
@@ -26,7 +16,8 @@ const FILE_TYPES = {
 };
 
 // Sem dados estáticos: a lista é populada em runtime por loadUploadedFiles(),
-// que busca os arquivos reais em /files (lidos de data/uploaded_files.json).
+// que busca os arquivos reais em /files (catálogo do usuário logado, ver
+// core/uploaded_files_store.py).
 const MOCK_FILES = [];
 
 // =============================================================
@@ -161,7 +152,5 @@ function getStorageStats() {
     totalFiles: MOCK_FILES.length,
     totalSize: MOCK_FILES.reduce((acc, f) => acc + f.size, 0),
     byType,
-    storageUsed: MOCK_USER.storageUsed,
-    storageTotal: MOCK_USER.storageTotal,
   };
 }

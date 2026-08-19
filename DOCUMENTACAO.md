@@ -5,23 +5,43 @@ Os scripts auxiliares agora vivem em `scripts/`, enquanto o Django fica em `mana
 ## Fluxo
 
 ```text
-Cliente envia arquivo no site
+Cliente envia arquivo no site (POST /upload)
          │
          ▼
+core/views.py salva o arquivo TEMPORARIAMENTE em media/ e enfileira
+a tarefa no Celery (core/tasks.classify_and_catalog_task) — a resposta
+HTTP não espera o resto acontecer, ver SISTEMA_DISTRIBUIDO.md
+         │
+         ▼  (worker Celery, fora do processo web)
 scripts/extrator_conteudo.py  → lê o arquivo ou link e prepara o conteúdo
          │
          ▼
 scripts/categorizer_gemini.py → envia o conteúdo pro Gemini e recebe a classificação
          │
          ▼
-scripts/file_catalog.py       → salva a classificação no catálogo local
+scripts/file_catalog.py       → salva a classificação no catalog.json local (scores best-effort)
          │
          ▼
-backend do site sobe o arquivo original pro Google Drive
+core/google_drive.py          → sobe o arquivo real pra pasta "buscaagil_upload"
+                                  no Google Drive do usuário logado
          │
          ▼
-scripts/file_catalog.py       → vincula o link/ID do Drive ao registro salvo
+core/uploaded_files_store.py  → grava categoria/tags/link do Drive no
+                                  catálogo do usuário (data/users/<id>.json)
+                                  e o arquivo local temporário é apagado
 ```
+
+Note que existem **dois catálogos JSON diferentes** com propósitos
+diferentes, e é fácil confundir os dois:
+
+- `catalog.json` (raiz do projeto) — usado só internamente por
+  `scripts/file_catalog.py`/`processar_upload.py` pra guardar os *scores*
+  de classificação do Gemini. Não é servido pro front-end e não é
+  versionado no git (é estado gerado em runtime).
+- `data/users/<id>.json` — o catálogo que o front-end de fato lê
+  (`GET /files`), um por usuário, espelhado no `uploaded_files.json` dentro
+  da pasta `buscaagil_upload` de cada um no Google Drive. Veja
+  `SISTEMA_DISTRIBUIDO.md` para o desenho completo.
 
 O orquestrador é `scripts/processar_upload.py`. Ele pode ser usado com:
 
@@ -58,26 +78,33 @@ catalog.update_cloud_path(resultado["file_id"], drive_url)
 
 ## Integração com o Django (já implementada)
 
-`core/views.py` chama o pipeline automaticamente em duas views:
+`core/views.py` + `core/tasks.py` (worker Celery) chamam o pipeline em duas
+frentes — upload de arquivo e cadastro de link — as duas exigem login com
+Google (`@login_required`), porque o destino final é o Drive do próprio
+usuário:
 
-- **`POST /upload`** (`upload_files`): depois de salvar o arquivo em `media/`
-  via `FileSystemStorage`, chama `_classify_and_catalog(...)`, que roda
-  `processar_upload(caminho_salvo, catalog_path=CATALOG_PATH)` e depois
-  `catalog.update_cloud_path(file_id, public_url)` — como não há upload real
-  pro Google Drive nesse projeto, a "cloud_path" registrada é a própria URL
-  pública servida pelo Django (`/media/<arquivo>`). O `catalog.json` fica na
-  raiz do projeto (`CATALOG_PATH = BASE_DIR / "catalog.json"`).
+- **`POST /upload`** (`upload_files`): salva o arquivo temporariamente em
+  `media/` via `FileSystemStorage` e enfileira
+  `classify_and_catalog_task.delay(user_id, entry_id, caminho_local,
+  nome_original)` — a resposta HTTP volta na hora com
+  `status: "processing"`, sem esperar o resto. O worker Celery
+  (`core/tasks._run_file_upload`) roda `processar_upload(...)`
+  (best-effort — best-effort de verdade: mesmo se a classificação falhar, o
+  arquivo ainda sobe pro Drive), sobe o arquivo pro Drive via
+  `core/google_drive.upload_file`, apaga o arquivo local, e grava
+  categoria/tags/link do Drive no catálogo do usuário
+  (`core/uploaded_files_store.update_entry`).
 
-  A classificação é **best-effort**: se faltar `GEMINI_API_KEY`, se o
-  formato não for suportado por `extrator_conteudo.py`, ou se a API do
-  Gemini falhar, o upload continua funcionando normalmente — só não grava
-  classificação para aquele arquivo (fica com `"classification": null` na
-  resposta e sem `category`/`tags` na listagem).
+  A classificação (não o upload em si) é **best-effort**: se faltar
+  `GEMINI_API_KEY`, se o formato não for suportado por
+  `extrator_conteudo.py`, ou se a API do Gemini falhar, o arquivo sobe pro
+  Drive normalmente — só não grava categoria/tags (fica com
+  `"category": null` na resposta).
 
-- **`GET /files`** (`list_uploaded_files`): lista os arquivos físicos em
-  `media/` e enriquece cada um com `category`, `tags` e `description` lidos
-  do `catalog.json` (casando pelo nome do arquivo salvo). O front-end
-  (`static/js/mock-data.js` → `loadUploadedFiles()`) consome esse endpoint e
+- **`GET /files`** (`list_uploaded_files`): lê o catálogo local do usuário
+  logado (`data/users/<user_id>.json`, um cache do que está no Drive dele —
+  ver `SISTEMA_DISTRIBUIDO.md`). O front-end
+  (`static/js/catalog-client.js` → `loadUploadedFiles()`) consome esse endpoint e
   mescla os arquivos reais nas telas de **dashboard** e **busca**, incluindo
   a categoria do Gemini como tag pesquisável.
 

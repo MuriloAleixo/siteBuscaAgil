@@ -37,10 +37,18 @@ class FileCatalog:
     # ---------- persistência ----------
 
     def _load(self) -> dict:
+        default = {"files": {}, "tags_index": {}, "category_index": {}}
         if self.json_path.exists():
             with open(self.json_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        return {"files": {}, "tags_index": {}, "category_index": {}}
+                raw = f.read().strip()
+            if raw:
+                data = json.loads(raw)
+                # Garante as chaves mesmo se o arquivo estiver truncado/vazio
+                # (`{}`) por causa de uma escrita interrompida no meio.
+                for key, empty_value in default.items():
+                    data.setdefault(key, empty_value)
+                return data
+        return default
 
     def _save(self):
         # grava em arquivo temporário e substitui, evita corromper o JSON

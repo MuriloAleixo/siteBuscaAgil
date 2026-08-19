@@ -8,21 +8,20 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.core.files.storage import FileSystemStorage
-from django.http import Http404, JsonResponse
-from django.shortcuts import render
+from django.http import JsonResponse
+from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from core import uploaded_files_store
+from core import google_drive, uploaded_files_store
+from core.models import DriveProfile
 from core.tasks import classify_and_catalog_task, classify_link_task
 from scripts.analisador_busca import BuscaAnalyzer
 from scripts.processar_upload import CATEGORIAS_POSSIVEIS
 
 logger = logging.getLogger(__name__)
-
-_read_uploaded_files_json = uploaded_files_store.read_all
-_write_uploaded_files_json = uploaded_files_store.write_all
 
 
 EXTENSION_TYPE_MAP = {
@@ -52,17 +51,6 @@ def _categorize_file(name: str, content_type: str | None) -> str:
     return "archive"
 
 
-ALLOWED_PAGES = {
-    "index": "index.html",
-    "dashboard": "dashboard.html",
-    "search": "search.html",
-    "upload_page": "upload.html",
-    "profile": "profile.html",
-    "auth": "auth.html",
-    "file_view": "file-view.html",
-}
-
-
 def _render_page(request, template_name: str):
     return render(request, template_name)
 
@@ -71,31 +59,82 @@ def index(request):
     return _render_page(request, "index.html")
 
 
+@login_required
 def dashboard(request):
     return _render_page(request, "dashboard.html")
 
 
+@login_required
 def search(request):
     return _render_page(request, "search.html")
 
 
+@login_required
 def upload_page(request):
     return _render_page(request, "upload.html")
 
 
+@login_required
 def profile(request):
     return _render_page(request, "profile.html")
 
 
 def auth(request):
+    """Tela de erro/retry: só é exibida quando o login com Google funcionou
+    mas a sincronização inicial com o Drive falhou (ver post_login_sync)."""
     return _render_page(request, "auth.html")
 
 
+@login_required
 def file_view(request):
     return _render_page(request, "file-view.html")
 
 
+@login_required
+def post_login_sync(request):
+    """
+    Roda logo depois do allauth autenticar o usuário via Google
+    (settings.LOGIN_REDIRECT_URL aponta pra cá) e ANTES de qualquer página
+    carregar: garante que a pasta "buscaagil_upload" existe no Drive do
+    usuário, baixa o uploaded_files.json de lá (se existir) pro cache local,
+    e atualiza a cota de armazenamento exibida no perfil.
+
+    Se o Drive falhar aqui (token sem escopo, API fora do ar etc.), manda o
+    usuário pra auth.html em vez do dashboard, com um botão pra tentar de
+    novo / reconceder acesso.
+    """
+    try:
+        service = google_drive.get_drive_service(request.user)
+        folder_id = google_drive.ensure_app_folder(service)
+        files, catalog_file_id = google_drive.download_catalog(service, folder_id)
+
+        # Primeiro acesso: a pasta acabou de ser criada e ainda não tem
+        # uploaded_files.json dentro. Cria já vazio, em vez de esperar o
+        # primeiro upload — assim pasta + catálogo sempre existem juntos.
+        if catalog_file_id is None:
+            catalog_file_id = google_drive.upload_catalog(service, folder_id, files, None)
+
+        used, total = google_drive.get_storage_quota(service)
+
+        DriveProfile.objects.update_or_create(
+            user=request.user,
+            defaults={
+                "folder_id": folder_id,
+                "catalog_file_id": catalog_file_id or "",
+                "storage_used_bytes": used,
+                "storage_total_bytes": total,
+            },
+        )
+        uploaded_files_store.write_all(request.user.id, files)
+    except Exception as exc:  # noqa: BLE001 - qualquer falha de Drive vira retry, não 500
+        logger.warning("Falha ao sincronizar Drive no login do usuário %s: %s", request.user.id, exc)
+        return redirect("auth")
+
+    return redirect("dashboard")
+
+
 @csrf_exempt
+@login_required
 @require_http_methods(["POST"])
 def upload_files(request):
     uploaded_files = request.FILES.getlist("files") or list(request.FILES.values())
@@ -108,15 +147,20 @@ def upload_files(request):
     saved_files = []
     for uploaded_file in uploaded_files:
         saved_name = storage.save(uploaded_file.name, uploaded_file)
-        public_url = storage.url(saved_name)
+        temp_public_url = storage.url(saved_name)
         content_type = getattr(uploaded_file, "content_type", "application/octet-stream")
 
-        # A classificação via Gemini roda num worker Celery separado (fila
-        # Redis) — a request não espera por ela, a entry entra com
-        # status="processing" e é atualizada de forma assíncrona depois.
-        async_result = classify_and_catalog_task.delay(saved_name, storage.path(saved_name), public_url)
+        # O arquivo é salvo em media/ só como pouso TEMPORÁRIO: o worker
+        # Celery classifica via Gemini, sobe pro Drive do usuário e apaga o
+        # local (ver core/tasks.py). A entry entra com status="processing" e
+        # some do polling quando vira "done" (url passa a ser o link do
+        # Drive) ou "error" (arquivo local é mantido pra não perder o dado).
+        async_result = classify_and_catalog_task.delay(
+            request.user.id, saved_name, storage.path(saved_name), uploaded_file.name
+        )
 
         uploaded_files_store.insert_entry(
+            request.user.id,
             {
                 "id": saved_name,
                 "name": uploaded_file.name,
@@ -124,21 +168,23 @@ def upload_files(request):
                 "content_type": content_type,
                 "size": uploaded_file.size,
                 "created_at": datetime.now(tz=timezone.utc).isoformat(),
-                "url": public_url,
+                # Aponta pro arquivo local temporário até o worker terminar
+                # o upload pro Drive — o polling em /files/<id>/status troca
+                # esse valor pelo link do Drive quando status vira "done".
+                "url": temp_public_url,
                 "status": "processing",
                 "category": None,
                 "tags": [],
                 "description": "",
                 "task_id": async_result.id,
-            }
+            },
         )
 
         saved_files.append(
             {
                 "original_name": uploaded_file.name,
                 "saved_name": saved_name,
-                "relative_path": f"media/{saved_name}",
-                "public_url": public_url,
+                "public_url": temp_public_url,
                 "size_bytes": uploaded_file.size,
                 "content_type": content_type,
                 "status": "processing",
@@ -150,6 +196,7 @@ def upload_files(request):
 
 
 @csrf_exempt
+@login_required
 @require_http_methods(["POST"])
 def add_link(request):
     """Cadastra um link (URL) no mesmo catálogo dos arquivos, com type='link'."""
@@ -172,7 +219,7 @@ def add_link(request):
         name = (parsed.netloc + parsed.path).rstrip("/")
 
     entry_id = f"link_{uuid.uuid4().hex[:8]}"
-    async_result = classify_link_task.delay(entry_id, url)
+    async_result = classify_link_task.delay(request.user.id, entry_id, url)
 
     entry = {
         "id": entry_id,
@@ -189,12 +236,13 @@ def add_link(request):
         "task_id": async_result.id,
     }
 
-    uploaded_files_store.insert_entry(entry)
+    uploaded_files_store.insert_entry(request.user.id, entry)
 
     return JsonResponse({"success": True, "file": entry})
 
 
 @csrf_exempt
+@login_required
 @require_http_methods(["POST"])
 def update_file_metadata(request, file_id: str):
     """Permite classificar/taguear manualmente um arquivo quando a
@@ -205,7 +253,7 @@ def update_file_metadata(request, file_id: str):
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "error": "JSON inválido."}, status=400)
 
-    registered_files = _read_uploaded_files_json()
+    registered_files = uploaded_files_store.read_all(request.user.id)
     entry = next((f for f in registered_files if f["id"] == file_id), None)
     if entry is None:
         return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
@@ -223,27 +271,31 @@ def update_file_metadata(request, file_id: str):
     if "description" in payload:
         entry["description"] = (payload.get("description") or "").strip()
 
-    _write_uploaded_files_json(registered_files)
+    uploaded_files_store.write_all(request.user.id, registered_files)
     return JsonResponse({"success": True, "file": entry})
 
 
+@login_required
 @require_http_methods(["GET"])
 def list_uploaded_files(request):
-    """Fonte única de verdade: lê data/uploaded_files.json (sem varrer o disco)."""
-    response = JsonResponse({"success": True, "files": _read_uploaded_files_json()})
+    """Fonte única de verdade no processo web: lê o cache local
+    (data/users/<id>.json), que é espelho do uploaded_files.json na
+    pasta do usuário no Drive."""
+    response = JsonResponse({"success": True, "files": uploaded_files_store.read_all(request.user.id)})
     response["Cache-Control"] = "no-store"
     return response
 
 
+@login_required
 @require_http_methods(["GET"])
 def file_status(request, file_id: str):
     """
-    Consulta o status de classificação assíncrona de um arquivo/link
+    Consulta o status de classificação/upload assíncrono de um arquivo/link
     (status: "processing" | "done" | "error"). O front-end usa isso pra dar
-    polling depois do upload, já que a classificação via Gemini roda num
-    worker Celery separado, fora da request de upload.
+    polling depois do upload, já que a classificação e o envio ao Drive
+    rodam num worker Celery separado, fora da request de upload.
     """
-    entry = uploaded_files_store.get_entry(file_id)
+    entry = uploaded_files_store.get_entry(request.user.id, file_id)
     if entry is None:
         return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
 
@@ -255,6 +307,7 @@ def file_status(request, file_id: str):
             "category": entry.get("category"),
             "tags": entry.get("tags", []),
             "description": entry.get("description", ""),
+            "url": entry.get("url"),
             "task_id": entry.get("task_id"),
         }
     )
@@ -265,30 +318,38 @@ def file_status(request, file_id: str):
 def _file_matches(entry: dict, categories: list[str], tags: list[str], query_lower: str) -> bool:
     file_category = (entry.get("category") or "").lower()
     file_tags = [t.lower() for t in (entry.get("tags") or [])]
+    name = (entry.get("name") or "").lower()
+    description = (entry.get("description") or "").lower()
 
     if categories and file_category in categories:
         return True
     if tags and any(t in file_tags for t in tags):
         return True
+    # As tags/sinônimos que o Gemini sugeriu (ver analisador_busca.py) também
+    # contam se aparecerem na descrição gerada na classificação — muita busca
+    # não bate com nenhuma tag literal, mas está claramente descrita no
+    # resumo do arquivo (ex.: tag "março" batendo em "fechamento de março").
+    if tags and any(t in description or t in name for t in tags):
+        return True
 
     # Fallback: substring simples no nome/descrição/categoria/tags. Garante
     # que a busca nunca fica pior que a antiga por causa de falha/ausência
     # da análise via Gemini (sem GEMINI_API_KEY, erro de rede etc.).
-    haystack = " ".join(
-        [entry.get("name", ""), entry.get("description", ""), file_category, " ".join(file_tags)]
-    ).lower()
+    haystack = " ".join([name, description, file_category, " ".join(file_tags)])
     return query_lower in haystack
 
 
+@login_required
 @require_http_methods(["GET"])
 def smart_search(request):
     """
     Busca assistida por IA: envia o texto do campo de busca para o Gemini,
     que devolve as categorias/tags candidatas mais prováveis, e usa isso
-    para filtrar data/uploaded_files.json por categoria e/ou tags.
+    para filtrar o catálogo local do usuário por categoria, tags e também
+    pela descrição gerada na classificação (ver _file_matches).
     """
     query = (request.GET.get("q") or "").strip()
-    all_files = _read_uploaded_files_json()
+    all_files = uploaded_files_store.read_all(request.user.id)
 
     if not query:
         response = JsonResponse({"success": True, "query": "", "categories": [], "tags": [], "files": all_files})

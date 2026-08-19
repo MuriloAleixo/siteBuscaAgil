@@ -6,7 +6,6 @@ lucide.createIcons();
 if (!requireAuth()) throw new Error('Not authenticated');
 
 const user = getCurrentUser();
-const stats = getStorageStats();
 
 // Populate
 if (document.getElementById('sidebar-avatar')) document.getElementById('sidebar-avatar').src = user.avatar;
@@ -34,11 +33,16 @@ setTimeout(() => {
   if (document.getElementById('storage-bar')) document.getElementById('storage-bar').style.width = storagePct + '%';
 }, 300);
 
-// Stats
-if (document.getElementById('stat-total')) document.getElementById('stat-total').textContent = stats.totalFiles;
-if (document.getElementById('stat-images')) document.getElementById('stat-images').textContent = stats.byType.image ? stats.byType.image.count : 0;
-if (document.getElementById('stat-pdfs')) document.getElementById('stat-pdfs').textContent = stats.byType.pdf ? stats.byType.pdf.count : 0;
-if (document.getElementById('stat-videos')) document.getElementById('stat-videos').textContent = stats.byType.video ? stats.byType.video.count : 0;
+// Stats — precisa carregar os arquivos reais primeiro (MOCK_FILES começa
+// vazio; ver loadUploadedFiles em catalog-client.js), senão fica sempre em 0.
+(async () => {
+  await loadUploadedFiles();
+  const stats = getStorageStats();
+  if (document.getElementById('stat-total')) document.getElementById('stat-total').textContent = stats.totalFiles;
+  if (document.getElementById('stat-images')) document.getElementById('stat-images').textContent = stats.byType.image ? stats.byType.image.count : 0;
+  if (document.getElementById('stat-pdfs')) document.getElementById('stat-pdfs').textContent = stats.byType.pdf ? stats.byType.pdf.count : 0;
+  if (document.getElementById('stat-videos')) document.getElementById('stat-videos').textContent = stats.byType.video ? stats.byType.video.count : 0;
+})();
 
 // Sidebar toggle
 const sbToggle = document.getElementById('sidebar-toggle');

@@ -3,4 +3,10 @@ __pycache__/
 *.pyc
 db.sqlite3
 venv/
+# catálogo interno de scores do Gemini (scripts/file_catalog.py) — estado
+# gerado em runtime, não código-fonte
+catalog.json
 data/*.lock
+# cache local por usuário — espelho do uploaded_files.json que vive no
+# Drive de cada um (ver core/uploaded_files_store.py); não é fonte da verdade
+data/users/
