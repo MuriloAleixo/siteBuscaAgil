@@ -3,20 +3,15 @@ from __future__ import annotations
 import logging
 import mimetypes
 import os
-from pathlib import Path
 
 from celery import shared_task
-from django.conf import settings
 from django.contrib.auth import get_user_model
 
 from core import google_drive, uploaded_files_store
 from core.models import DriveProfile
-from scripts.file_catalog import FileCatalog
 from scripts.processar_upload import processar_upload
 
 logger = logging.getLogger(__name__)
-
-CATALOG_PATH = str(Path(settings.BASE_DIR) / "catalog.json")
 
 
 def _sync_catalog_to_drive(service, user_id: int) -> None:
@@ -35,7 +30,7 @@ def _classify_best_effort(origem: str) -> dict | None:
     de GEMINI_API_KEY ou erro de rede não podem impedir o arquivo de ir pro
     Drive — só ficam sem categoria/tags."""
     try:
-        return processar_upload(origem, catalog_path=CATALOG_PATH)
+        return processar_upload(origem)
     except Exception as exc:  # noqa: BLE001
         logger.warning("Não foi possível classificar '%s': %s", origem, exc)
         return None
@@ -62,12 +57,6 @@ def _run_file_upload(user_id: int, saved_path: str, entry_id: str, original_name
         # Mantém o arquivo local (não deleta) pra não perder o dado enviado.
         uploaded_files_store.update_entry(user_id, entry_id, status="error")
         return
-
-    if resultado and resultado.get("file_id"):
-        try:
-            FileCatalog(CATALOG_PATH).update_cloud_path(resultado["file_id"], uploaded["web_view_link"])
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Não foi possível vincular o link do Drive no catalog.json: %s", exc)
 
     uploaded_files_store.update_entry(
         user_id,

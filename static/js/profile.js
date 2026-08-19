@@ -24,15 +24,6 @@ if (document.getElementById('member-since')) {
   });
 }
 
-// Storage
-const storagePct = (user.storageUsed / user.storageTotal * 100).toFixed(1);
-if (document.getElementById('storage-text')) {
-  document.getElementById('storage-text').textContent = `${user.storageUsed} GB de ${user.storageTotal} GB (${storagePct}%)`;
-}
-setTimeout(() => {
-  if (document.getElementById('storage-bar')) document.getElementById('storage-bar').style.width = storagePct + '%';
-}, 300);
-
 // Stats — precisa carregar os arquivos reais primeiro (MOCK_FILES começa
 // vazio; ver loadUploadedFiles em catalog-client.js), senão fica sempre em 0.
 (async () => {

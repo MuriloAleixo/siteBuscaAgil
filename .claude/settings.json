@@ -108,7 +108,21 @@
       "Bash(wsl.exe -e bash -lc \"cat /home/user/Documents/siteBuscaAgil/data/users/1.json; echo; echo '---media---'; ls /home/user/Documents/siteBuscaAgil/media/\")",
       "Bash(wsl.exe -e bash -lc 'cd /home/user/Documents/siteBuscaAgil && source venv/bin/activate && python -c \" *)",
       "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && rm catalog.json && echo 'catálogo interno resetado, será recriado no próximo upload'\")",
-      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'smartSearchFiles\\\\|search-query' static/js/*.js | head -20\")"
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'smartSearchFiles\\\\|search-query' static/js/*.js | head -20\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && cat catalog.json 2>&1 | head -c 800\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -rln 'FileCatalog\\\\|CATALOG_PATH\\\\|catalog.json' --include='*.py' . | grep -v venv | grep -v __pycache__\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'FileCatalog\\\\|CATALOG_PATH\\\\|catalog.json' core/models.py busca_agil/settings.py\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -rln 'catalog\\\\.json\\\\b' --include='*.md' . | grep -v venv\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -in 'catalog.json\\\\|file_catalog\\\\|FileCatalog' README.md SISTEMA_DISTRIBUIDO.md 2>/dev/null\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && rm -v catalog.json scripts/file_catalog.py\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'eh_link' scripts/processar_upload.py scripts/extrator_conteudo.py core/*.py\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'settings\\\\.\\\\|file_id' core/tasks.py\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -in 'catalog.json\\\\|file_catalog\\\\|FileCatalog\\\\|file_id' DOCUMENTACAO.md\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -rln 'file_catalog\\\\|FileCatalog\\\\|catalog\\\\.json' --include='*.py' --include='*.md' --include='*.js' --include='*.html' . 2>/dev/null | grep -v venv | grep -v __pycache__ || echo 'nenhuma referência restante'\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && source venv/bin/activate && python manage.py check 2>&1 && echo '--- import check ---' && python -c 'from core import tasks; from scripts.processar_upload import processar_upload; print\\(\\\\\"OK\\\\\"\\)'\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && source venv/bin/activate && python manage.py shell -c \\\\\"from core import tasks; from scripts.processar_upload import processar_upload; print\\('OK, imports funcionam'\\)\\\\\"\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'storage\\\\|Storage\\\\|Uso do Google Drive' templates/profile.html static/js/profile.js\")",
+      "Bash(wsl.exe -e bash -lc \"cd /home/user/Documents/siteBuscaAgil && grep -n 'storage-text\\\\|storage-bar' templates/profile.html static/js/profile.js; echo '---confirmando dashboard intacto---'; grep -n 'storage-text\\\\|storage-bar\\\\|storage-label' templates/dashboard.html static/js/dashboard.js\")"
     ]
   }
 }

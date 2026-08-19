@@ -19,9 +19,6 @@ scripts/extrator_conteudo.py  → lê o arquivo ou link e prepara o conteúdo
 scripts/categorizer_gemini.py → envia o conteúdo pro Gemini e recebe a classificação
          │
          ▼
-scripts/file_catalog.py       → salva a classificação no catalog.json local (scores best-effort)
-         │
-         ▼
 core/google_drive.py          → sobe o arquivo real pra pasta "buscaagil_upload"
                                   no Google Drive do usuário logado
          │
@@ -31,17 +28,12 @@ core/uploaded_files_store.py  → grava categoria/tags/link do Drive no
                                   e o arquivo local temporário é apagado
 ```
 
-Note que existem **dois catálogos JSON diferentes** com propósitos
-diferentes, e é fácil confundir os dois:
-
-- `catalog.json` (raiz do projeto) — usado só internamente por
-  `scripts/file_catalog.py`/`processar_upload.py` pra guardar os *scores*
-  de classificação do Gemini. Não é servido pro front-end e não é
-  versionado no git (é estado gerado em runtime).
-- `data/users/<id>.json` — o catálogo que o front-end de fato lê
-  (`GET /files`), um por usuário, espelhado no `uploaded_files.json` dentro
-  da pasta `buscaagil_upload` de cada um no Google Drive. Veja
-  `SISTEMA_DISTRIBUIDO.md` para o desenho completo.
+`data/users/<id>.json` é o único catálogo que existe — um por usuário,
+espelhado no `uploaded_files.json` dentro da pasta `buscaagil_upload` de
+cada um no Google Drive (fonte da verdade). Veja `SISTEMA_DISTRIBUIDO.md`
+para o desenho completo. Não existe mais um catálogo interno separado
+guardando os *scores* de classificação — a classificação é usada só na
+hora e descartada se não for salva no catálogo do usuário.
 
 O orquestrador é `scripts/processar_upload.py`. Ele pode ser usado com:
 
@@ -52,9 +44,6 @@ python -m scripts.processar_upload "https://exemplo.com/pagina"
 
 ## Resumo dos scripts
 
-### `scripts/file_catalog.py`
-Camada de armazenamento do catálogo JSON. Expõe `FileCatalog` com `add_file`, `update_cloud_path`, `search`, `search_text`, `update_tags` e `remove_file`.
-
 ### `scripts/extrator_conteudo.py`
 Prepara o conteúdo para o Gemini. Suporta texto, arquivos nativos e links. Dependências principais: `pandas`, `openpyxl`, `xlrd`, `python-docx`, `requests`, `beautifulsoup4`.
 
@@ -62,18 +51,15 @@ Prepara o conteúdo para o Gemini. Suporta texto, arquivos nativos e links. Depe
 Conversa com a API do Gemini e devolve um `ClassificacaoArquivo` validado com `pydantic`.
 
 ### `scripts/processar_upload.py`
-Amarra os três módulos acima. Recebe a origem do arquivo, prepara o conteúdo, classifica, grava no catálogo e devolve o resumo com `file_id`.
+Amarra os dois módulos acima. Recebe a origem do arquivo, prepara o conteúdo, classifica e devolve o resumo (categoria, tags, descrição, scores) — quem grava no catálogo do usuário é `core/tasks.py`, não este módulo.
 
 ## Uso no backend
 
 ```python
 from scripts.processar_upload import processar_upload
-from scripts.file_catalog import FileCatalog
 
 resultado = processar_upload("/tmp/uploads/nome_do_arquivo.pdf")
-
-catalog = FileCatalog("catalog.json")
-catalog.update_cloud_path(resultado["file_id"], drive_url)
+# resultado = {"categoria_principal": ..., "tags": [...], "descricao": ..., "scores": {...}}
 ```
 
 ## Integração com o Django (já implementada)
