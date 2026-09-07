@@ -72,6 +72,11 @@ def search(request):
 
 
 @login_required
+def processing_queue(request):
+    return _render_page(request, "processing.html")
+
+
+@login_required
 def upload_page(request):
     return _render_page(request, "upload.html")
 

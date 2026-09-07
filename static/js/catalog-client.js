@@ -89,6 +89,7 @@ function mapUploadedFileToCard(f) {
     tags,
     category: f.category || null,
     description: f.description || "",
+    status: f.status || "done",
   };
 }
 

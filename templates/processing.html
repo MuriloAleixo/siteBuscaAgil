@@ -1,0 +1,145 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fila de Processamento — BuscaÁgil</title>
+  <link rel="icon" type="image/svg+xml" href="{% static 'img/favicon.svg' %}" />
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'], mono: ['Space Grotesk','monospace'] } } } }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="grid-bg google-search-page">
+
+<div class="dashboard-layout google-search-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl flex items-center justify-center pulse" style="background:linear-gradient(135deg,var(--violet),var(--cyan))">
+          <i data-lucide="search" class="w-4 h-4 text-white"></i>
+        </div>
+        <span class="logo-text text-lg text-white">Busca<span class="gradient-text">Ágil</span></span>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Mecanismo de Busca</span>
+      <a href="dashboard.html" class="nav-item">
+        <i data-lucide="search" class="nav-icon"></i>
+        <span>Buscar Arquivos</span>
+      </a>
+      <a href="upload.html" class="nav-item">
+        <i data-lucide="upload-cloud" class="nav-icon"></i>
+        <span>Enviar Arquivo</span>
+      </a>
+      <a href="processing.html" class="nav-item active">
+        <i data-lucide="loader-2" class="nav-icon"></i>
+        <span>Fila de Processamento</span>
+      </a>
+
+      <span class="nav-section-label">Sua Conta</span>
+      <a href="profile.html" class="nav-item">
+        <i data-lucide="user-circle" class="nav-icon"></i>
+        <span>Perfil / Drive</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="flex items-center gap-3 p-3 rounded-xl" style="background:var(--bg-card);border:1px solid var(--border)">
+        <img id="sidebar-avatar" src="" alt="Avatar" class="avatar avatar-sm" />
+        <div class="flex-1 min-w-0">
+          <p id="sidebar-name" class="text-xs font-bold text-white truncate" style="font-family:'Space Grotesk',sans-serif"></p>
+          <p class="text-xs truncate text-cyan-400">Drive Conectado ✓</p>
+        </div>
+        <button onclick="logout()" class="btn btn-ghost btn-icon" title="Sair" style="padding:4px;color:var(--text-3)">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ── MAIN CONTENT ── -->
+  <div class="main-content">
+
+    <!-- Header -->
+    <header class="top-header google-search-header">
+      <button class="btn btn-ghost btn-icon lg:hidden" id="sidebar-toggle">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+      <a href="dashboard.html" class="google-search-logo">
+        <span class="google-search-logo__mark"><i data-lucide="search" class="w-4 h-4"></i></span>
+        <span class="logo-text">Busca<span class="gradient-text">Ágil</span></span>
+      </a>
+      <div class="flex items-center gap-2 ml-auto">
+        <a href="upload.html" class="google-search-upload" title="Enviar arquivo">
+          <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Enviar</span>
+        </a>
+        <a href="profile.html">
+          <img id="header-avatar" src="" alt="Avatar" class="avatar avatar-sm hover:ring-2" style="--tw-ring-color:var(--violet)" />
+        </a>
+      </div>
+    </header>
+
+    <!-- Page Body -->
+    <main class="page-content google-search-content fade-up">
+
+      <!-- Header Intro -->
+      <section class="google-search-hero">
+        <div>
+          <p class="google-search-eyebrow">ACOMPANHAMENTO</p>
+          <h1>Fila de <span>Processamento</span></h1>
+          <p class="google-search-description">Veja em tempo real o que ainda está sendo classificado pela IA — a lista atualiza sozinha, não precisa recarregar a página.</p>
+        </div>
+      </section>
+
+      <!-- Processing List -->
+      <div id="processing-list" class="flex flex-col gap-3"></div>
+
+      <!-- Empty State -->
+      <div id="processing-empty" class="empty-state hidden">
+        <div class="empty-icon">
+          <i data-lucide="check-circle-2" class="w-10 h-10"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Nada em processamento no momento</h3>
+        <p style="color:var(--text-2);font-size:14px">Os arquivos que você enviar aparecem aqui enquanto a IA classifica.</p>
+        <a href="upload.html" class="btn btn-outline btn-sm mt-2">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i> Enviar Arquivo
+        </a>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<nav class="mobile-nav">
+  <div class="mobile-nav-items">
+    <a href="dashboard.html" class="mobile-nav-item">
+      <i data-lucide="search"></i><span>Buscar</span>
+    </a>
+    <a href="upload.html" class="mobile-nav-item">
+      <i data-lucide="upload-cloud"></i><span>Enviar</span>
+    </a>
+    <a href="profile.html" class="mobile-nav-item">
+      <i data-lucide="user-circle"></i><span>Perfil</span>
+    </a>
+  </div>
+</nav>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>window.__BUSCA_AGIL_USER__ = {{ busca_agil_user_json|safe }};</script>
+<script src="{% static 'js/catalog-client.js' %}"></script>
+<script src="{% static 'js/file-utils.js' %}"></script>
+<script src="{% static 'js/auth.js' %}"></script>
+<script src="{% static 'js/task-notifications.js' %}"></script>
+<script src="{% static 'js/processing.js' %}"></script>
+</body>
+</html>

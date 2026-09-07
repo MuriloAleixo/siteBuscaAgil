@@ -9,6 +9,7 @@ urlpatterns = [
     path("index.html", views.index, name="index"),
     path("dashboard.html", views.dashboard, name="dashboard"),
     path("search.html", views.search, name="search"),
+    path("processing.html", views.processing_queue, name="processing_queue"),
     path("upload.html", views.upload_page, name="upload_page"),
     path("profile.html", views.profile, name="profile"),
     path("auth.html", views.auth, name="auth"),

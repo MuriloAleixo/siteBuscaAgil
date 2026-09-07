@@ -217,8 +217,13 @@ async function startUploads() {
         });
 
         // Classificação via IA roda assíncrona (worker Celery); avisa quando terminar.
+        // Também registra no rastreador persistente (task-notifications.js): se a
+        // classificação demorar mais que o polling curto abaixo, ou o usuário sair
+        // desta página antes disso, quem avisa quando terminar é ele.
+        if (typeof BuscaAgilTasks !== 'undefined') BuscaAgilTasks.track(fileId, item.file.name);
         pollFileStatus(fileId, {
           onUpdate: (statusData) => {
+            if (typeof BuscaAgilTasks !== 'undefined') BuscaAgilTasks.resolve(fileId);
             const mockEntry = MOCK_FILES.find((f) => f.id === fileId);
             if (mockEntry && statusData.status === 'done') {
               mockEntry.tags = statusData.tags || [];
@@ -303,8 +308,10 @@ async function addLink() {
       description: f.description || '',
     });
 
+    if (typeof BuscaAgilTasks !== 'undefined') BuscaAgilTasks.track(f.id, f.name);
     pollFileStatus(f.id, {
       onUpdate: (statusData) => {
+        if (typeof BuscaAgilTasks !== 'undefined') BuscaAgilTasks.resolve(f.id);
         const mockEntry = MOCK_FILES.find((m) => m.id === f.id);
         if (mockEntry && statusData.status === 'done') {
           mockEntry.tags = statusData.tags || [];

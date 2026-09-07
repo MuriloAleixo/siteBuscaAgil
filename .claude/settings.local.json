@@ -181,7 +181,17 @@
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && git ls-files media/ data/users/ 2>/dev/null\")",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && git checkout -- media/.gitkeep && git status --short | grep -i gitkeep\")",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"ls -la /home/user/Documentos/siteBuscaAgil/media/.gitkeep\")",
-      "Bash(wsl.exe -d Ubuntu -- bash -lc \"ls /home/user/Documentos/siteBuscaAgil/*.md\")"
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"ls /home/user/Documentos/siteBuscaAgil/*.md\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"command -v node && node --check /home/user/Documentos/siteBuscaAgil/static/js/task-notifications.js && echo SYNTAX_OK || echo 'node not found or syntax error'\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose ps\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"curl -s -o /dev/null -w 'HTTP %{http_code}\\\\n' http://localhost:8000/static/js/task-notifications.js\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose exec -T web python manage.py check 2>&1 | tail -10\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc 'for p in index.html dashboard.html search.html upload.html file-view.html profile.html; do code=$\\(curl -s -o /dev/null -w '\\\\''%{http_code}'\\\\'' http://localhost:8000/$p\\); echo \"$p -> $code\"; done')",
+      "Bash(wsl.exe -d Ubuntu -- bash -c ' *)",
+      "PowerShell(wsl.exe -d Ubuntu -- bash -lc \"for p in index.html dashboard.html search.html upload.html file-view.html profile.html; do code=`curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/`\\\\$p; echo \\\\\"\\\\$p -> \\\\$code\\\\\"; done\")",
+      "PowerShell(wsl.exe -d Ubuntu -- bash /home/user/Documentos/siteBuscaAgil/scripts/_tmp_check_pages.sh)",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"curl -s -o /dev/null -w 'processing.html -> %{http_code}\\\\n' http://localhost:8000/processing.html; curl -s -o /dev/null -w 'processing.js -> %{http_code}\\\\n' http://localhost:8000/static/js/processing.js\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"curl -s -o /dev/null -w 'dashboard.html -> %{http_code}\\\\n' http://localhost:8000/dashboard.html; curl -s -o /dev/null -w 'upload.html -> %{http_code}\\\\n' http://localhost:8000/upload.html\")"
     ],
     "additionalDirectories": [
       "\\\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil\\static",

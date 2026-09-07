@@ -38,6 +38,10 @@
         <i data-lucide="upload-cloud" class="nav-icon"></i>
         <span>Enviar Arquivo</span>
       </a>
+      <a href="processing.html" class="nav-item">
+        <i data-lucide="loader-2" class="nav-icon"></i>
+        <span>Fila de Processamento</span>
+      </a>
 
       <span class="nav-section-label">Filtrar por Formato</span>
       <a href="#" class="nav-item" onclick="filterByType('image')">
@@ -225,6 +229,7 @@
 <script src="{% static 'js/catalog-client.js' %}"></script>
 <script src="{% static 'js/file-utils.js' %}"></script>
 <script src="{% static 'js/auth.js' %}"></script>
+<script src="{% static 'js/task-notifications.js' %}"></script>
 <script src="{% static 'js/dashboard.js' %}"></script>
 </body>
 </html>

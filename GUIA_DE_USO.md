@@ -75,8 +75,23 @@ barra de progresso, `✓ Enviado` ou `Erro`). O envio em si é rápido; a
 classificação e o envio definitivo pro Drive acontecem em segundo plano
 logo em seguida — um aviso na tela confirma quando termina, já com a
 categoria encontrada (ou avisando que não achou nenhuma, o que também é
-normal). Clique em **"Ir para a Busca"** quando terminar, ou
+normal). Se a classificação demorar mais que o normal (comum em vídeos, por
+exemplo), pode fechar a tela de upload e continuar navegando — o aviso
+aparece assim que terminar, em qualquer página do site que você estiver.
+Clique em **"Ver Processamento"** pra acompanhar ao vivo, **"Ir para a
+Busca"** quando terminar, ou
 **"Enviar mais"** pra continuar enviando.
+
+## Fila De Processamento
+
+Tela dedicada (**"Fila de Processamento"** na barra lateral, ou o botão
+**"Ver Processamento"** depois de um upload) pra acompanhar ao vivo tudo
+que ainda está sendo classificado pela IA — sem precisar recarregar a
+página. Cada item mostra um ícone girando com **"Classificando..."**
+enquanto está em andamento; quando termina, mostra rapidamente o resultado
+(a categoria encontrada, ou um aviso de erro) antes de sair da lista. Se
+não houver nada em processamento, a tela mostra uma mensagem avisando que
+está tudo em dia.
 
 ## Ver Detalhes De Um Arquivo
 
