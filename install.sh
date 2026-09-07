@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# setup.sh — sobe o BuscaÁgil inteiro (Django, Celery+Redis, IA local via
+# install.sh — sobe o BuscaÁgil inteiro (Django, Celery+Redis, IA local via
 # Ollama) do zero, só com Docker instalado. Veja README.md, seção
 # "Rodar Com Docker (Recomendado)".
 set -euo pipefail
@@ -121,9 +121,9 @@ fi
 # 4. Classificação de arquivo ponta-a-ponta (IA local, com fallback pro
 # Gemini já embutido no próprio processar_upload) — não derruba o setup se
 # falhar, só avisa, já que depende de GEMINI_API_KEY/rede como plano B.
-echo "teste smoke setup.sh: contrato de prestação de serviços" > /tmp/setup_smoke_test.txt
-docker compose cp /tmp/setup_smoke_test.txt web:/tmp/setup_smoke_test.txt >/dev/null 2>&1 || true
-classify_output=$(docker compose exec -T web python -m scripts.processar_upload /tmp/setup_smoke_test.txt 2>/dev/null) || true
+echo "teste smoke install.sh: contrato de prestação de serviços" > /tmp/install_smoke_test.txt
+docker compose cp /tmp/install_smoke_test.txt web:/tmp/install_smoke_test.txt >/dev/null 2>&1 || true
+classify_output=$(docker compose exec -T web python -m scripts.processar_upload /tmp/install_smoke_test.txt 2>/dev/null) || true
 case "$classify_output" in
     *categoria_principal*)
         echo "  [OK]     Classificação de arquivo (IA local/Gemini) funcionando"
@@ -133,8 +133,8 @@ case "$classify_output" in
         echo "           estiver desligado sem GEMINI_API_KEY configurada)"
         ;;
 esac
-rm -f /tmp/setup_smoke_test.txt
-docker compose exec -T web rm -f /tmp/setup_smoke_test.txt >/dev/null 2>&1 || true
+rm -f /tmp/install_smoke_test.txt
+docker compose exec -T web rm -f /tmp/install_smoke_test.txt >/dev/null 2>&1 || true
 
 echo
 if [ "$smoke_fail" -ne 0 ]; then
@@ -148,5 +148,5 @@ echo "Comandos úteis:"
 echo "  docker compose logs -f        # acompanhar os logs de tudo"
 echo "  docker compose logs -f worker # só o worker (classificação de arquivos)"
 echo "  docker compose down           # parar tudo"
-echo "  ./setup.sh                    # rodar de novo (idempotente)"
+echo "  ./install.sh                  # rodar de novo (idempotente)"
 echo "  ./uninstall.sh                # remover containers/imagens/volumes/cache"

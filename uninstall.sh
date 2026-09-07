@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# uninstall.sh — desfaz tudo que ./setup.sh criou: containers, imagens
+# uninstall.sh — desfaz tudo que ./install.sh criou: containers, imagens
 # buildadas, volumes (incluindo os modelos de IA baixados no Ollama),
 # banco de dados local e caches. Depois de rodar, o repositório fica só com
 # código-fonte + arquivos de instrução/configuração (README, Dockerfile,
-# docker-compose.yml, setup.sh, .env.example etc.) — pronto pra rodar
-# ./setup.sh de novo do zero, como se nunca tivesse sido executado.
+# docker-compose.yml, install.sh, .env.example etc.) — pronto pra rodar
+# ./install.sh de novo do zero, como se nunca tivesse sido executado.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "Isto vai:"
 echo "  - Parar e remover os containers, a rede e os volumes deste projeto"
 echo "    (inclui o volume do Ollama — os modelos baixados, ~3GB, serão"
-echo "    apagados e baixados de novo no próximo ./setup.sh)"
+echo "    apagados e baixados de novo no próximo ./install.sh)"
 echo "  - Remover as imagens Docker buildadas localmente (web/worker) e a"
 echo "    imagem do Ollama"
 echo "  - Apagar db.sqlite3, o conteúdo de media/ e o cache local em"
@@ -56,4 +56,4 @@ esac
 
 echo
 echo "Pronto. Só sobrou o necessário pra reconstruir o projeto do zero."
-echo "Pra subir tudo de novo: ./setup.sh"
+echo "Pra subir tudo de novo: ./install.sh"

@@ -88,7 +88,7 @@ precisar instalar Python/venv/Redis/ffmpeg no seu WSL.
 2. Rode:
 
    ```bash
-   ./setup.sh
+   ./install.sh
    ```
 
 O script builda as imagens, sobe o Ollama, baixa os modelos de IA local,
@@ -109,7 +109,7 @@ docker compose down       # parar tudo
 
 Pra desfazer tudo (containers, imagens, volumes com os modelos baixados,
 `db.sqlite3`, cache local) e voltar a um estado zerado — só com o código e
-os arquivos de configuração/instrução, pronto pra rodar `./setup.sh` de
+os arquivos de configuração/instrução, pronto pra rodar `./install.sh` de
 novo do zero:
 
 ```bash
@@ -207,14 +207,14 @@ Gemini se o container estiver fora do ar ou o modelo local falhar. Pra
 desligar de vez e usar só o Gemini, defina `LOCAL_AI_ENABLED=false` no
 `.env`.
 
-Se você já rodou `./setup.sh` (seção 2), os passos abaixo já foram feitos
+Se você já rodou `./install.sh` (seção 2), os passos abaixo já foram feitos
 automaticamente — pule direto pra **"Como funciona o roteamento"**. Os
 comandos abaixo servem pra quem quiser rodar na mão (fluxo manual, ou pra
 trocar de modelo depois).
 
 **1. Subir o container do Ollama** (no fluxo manual, só o serviço `ollama` —
 o `docker-compose.yml` também define `web`/`worker`, usados pelo
-`./setup.sh`):
+`./install.sh`):
 
 ```bash
 docker compose up -d ollama
@@ -260,7 +260,7 @@ automaticamente pro tratamento certo, pela extensão:
 
 ### 6. Rodar Manualmente (Sem Docker)
 
-Alternativa a `./setup.sh` pra quem quiser rodar cada peça na mão, direto no
+Alternativa a `./install.sh` pra quem quiser rodar cada peça na mão, direto no
 WSL. As seções 3, 4 e 5 (credenciais) valem pros dois jeitos de rodar.
 
 **Criar ambiente e instalar bibliotecas:**

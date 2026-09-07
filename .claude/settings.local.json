@@ -191,7 +191,15 @@
       "PowerShell(wsl.exe -d Ubuntu -- bash -lc \"for p in index.html dashboard.html search.html upload.html file-view.html profile.html; do code=`curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/`\\\\$p; echo \\\\\"\\\\$p -> \\\\$code\\\\\"; done\")",
       "PowerShell(wsl.exe -d Ubuntu -- bash /home/user/Documentos/siteBuscaAgil/scripts/_tmp_check_pages.sh)",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"curl -s -o /dev/null -w 'processing.html -> %{http_code}\\\\n' http://localhost:8000/processing.html; curl -s -o /dev/null -w 'processing.js -> %{http_code}\\\\n' http://localhost:8000/static/js/processing.js\")",
-      "Bash(wsl.exe -d Ubuntu -- bash -lc \"curl -s -o /dev/null -w 'dashboard.html -> %{http_code}\\\\n' http://localhost:8000/dashboard.html; curl -s -o /dev/null -w 'upload.html -> %{http_code}\\\\n' http://localhost:8000/upload.html\")"
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"curl -s -o /dev/null -w 'dashboard.html -> %{http_code}\\\\n' http://localhost:8000/dashboard.html; curl -s -o /dev/null -w 'upload.html -> %{http_code}\\\\n' http://localhost:8000/upload.html\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && git log --follow --format='%h %ad %s' --date=short -- catalog.json | tail -5 && echo '---tracked?---' && git ls-files catalog.json\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && git rm -q catalog.json && git mv setup.sh install.sh && echo done\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && ls -la install.sh\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && sed -i 's/setup\\\\\\\\.sh/install.sh/g' uninstall.sh && grep -n 'install.sh\\\\\\\\|setup.sh' uninstall.sh\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"ls -la /home/user/Documentos/siteBuscaAgil/uninstall.sh /home/user/Documentos/siteBuscaAgil/install.sh\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"chmod +x /home/user/Documentos/siteBuscaAgil/install.sh && bash -n /home/user/Documentos/siteBuscaAgil/install.sh && bash -n /home/user/Documentos/siteBuscaAgil/uninstall.sh && echo OK\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && sed -i 's/setup\\\\\\\\.sh/install.sh/g' README.md && grep -n 'install.sh\\\\\\\\|setup.sh' README.md\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && grep -rn 'install.sh' README.md uninstall.sh install.sh | head -20 && echo '---' && bash -n install.sh && bash -n uninstall.sh && echo SYNTAX_OK && git status --short\")"
     ],
     "additionalDirectories": [
       "\\\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil\\static",
