@@ -84,8 +84,9 @@ Busca"** quando terminar, ou
 
 ## Fila De Processamento
 
-Tela dedicada (**"Fila de Processamento"** na barra lateral, ou o botão
-**"Ver Processamento"** depois de um upload) pra acompanhar ao vivo tudo
+Tela dedicada (ícone **"Fila"** no cabeçalho do painel principal, ao lado
+de "Enviar" — ou o botão **"Ver Processamento"** depois de um upload) pra
+acompanhar ao vivo tudo
 que ainda está sendo classificado pela IA — sem precisar recarregar a
 página. Cada item mostra um ícone girando com **"Classificando..."**
 enquanto está em andamento; quando termina, mostra rapidamente o resultado

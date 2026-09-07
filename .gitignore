@@ -4,6 +4,10 @@ __pycache__/
 db.sqlite3
 venv/
 data/*.lock
+# pouso temporário de upload — o worker apaga assim que confirma o envio
+# pro Drive; nada aqui deveria sobreviver de verdade (ver core/views.py)
+media/*
+!media/.gitkeep
 # cache local por usuário — espelho do uploaded_files.json que vive no
 # Drive de cada um (ver core/uploaded_files_store.py); não é fonte da verdade
 data/users/

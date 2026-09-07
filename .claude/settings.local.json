@@ -199,7 +199,22 @@
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"ls -la /home/user/Documentos/siteBuscaAgil/uninstall.sh /home/user/Documentos/siteBuscaAgil/install.sh\")",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"chmod +x /home/user/Documentos/siteBuscaAgil/install.sh && bash -n /home/user/Documentos/siteBuscaAgil/install.sh && bash -n /home/user/Documentos/siteBuscaAgil/uninstall.sh && echo OK\")",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && sed -i 's/setup\\\\\\\\.sh/install.sh/g' README.md && grep -n 'install.sh\\\\\\\\|setup.sh' README.md\")",
-      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && grep -rn 'install.sh' README.md uninstall.sh install.sh | head -20 && echo '---' && bash -n install.sh && bash -n uninstall.sh && echo SYNTAX_OK && git status --short\")"
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && grep -rn 'install.sh' README.md uninstall.sh install.sh | head -20 && echo '---' && bash -n install.sh && bash -n uninstall.sh && echo SYNTAX_OK && git status --short\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose logs web --no-color --tail 100\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose exec -T web python manage.py check 2>&1 | tail -10 && echo '--- celery ping ---' && docker compose exec -T worker celery -A busca_agil inspect ping --timeout 10\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc 'cd /home/user/Documentos/siteBuscaAgil && docker compose exec -T web python manage.py shell -c \" *)",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose logs web --no-color --tail 60\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose ps && echo '--- worker logs ---' && docker compose logs worker --no-color --tail 60\")",
+      "Bash(grep -n \"worker:\" -A 15 \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\user\\\\Documentos\\\\siteBuscaAgil\\\\docker-compose.yml\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose up -d --force-recreate worker 2>&1 | tail -20\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc 'cd /home/user/Documentos/siteBuscaAgil && sleep 3 && docker compose exec -T web python -c \" *)",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && sleep 3 && docker compose logs worker --no-color --tail 15\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose logs worker --no-color --tail 8\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose exec -T web python manage.py check 2>&1 | tail -5\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && bash -n install.sh && echo SYNTAX_OK\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose exec -T web celery -A busca_agil inspect ping --timeout 10 2>&1 | tail -5\")",
+      "Bash(wsl.exe -d Ubuntu -- bash -lc \"chmod +x /home/user/Documentos/siteBuscaAgil/install.sh && ls -la /home/user/Documentos/siteBuscaAgil/install.sh\")",
+      "Bash(grep -n \"volumes:\" -A 2 \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\user\\\\Documentos\\\\siteBuscaAgil\\\\docker-compose.yml\")"
     ],
     "additionalDirectories": [
       "\\\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil\\static",

@@ -162,9 +162,19 @@ def upload_files(request):
         # local (ver core/tasks.py). A entry entra com status="processing" e
         # some do polling quando vira "done" (url passa a ser o link do
         # Drive) ou "error" (arquivo local é mantido pra não perder o dado).
-        async_result = classify_and_catalog_task.delay(
-            request.user.id, saved_name, storage.path(saved_name), uploaded_file.name
-        )
+        try:
+            async_result = classify_and_catalog_task.delay(
+                request.user.id, saved_name, storage.path(saved_name), uploaded_file.name
+            )
+            entry_status = "processing"
+            task_id = async_result.id
+        except Exception as exc:  # noqa: BLE001
+            # Broker (Redis) fora do ar não pode fazer o arquivo já salvo em
+            # media/ sumir sem deixar rastro — sem isso, a entry nunca era
+            # criada e o arquivo ficava órfão, invisível em qualquer tela.
+            logger.warning("Não foi possível enfileirar a classificação de '%s': %s", uploaded_file.name, exc)
+            entry_status = "error"
+            task_id = None
 
         uploaded_files_store.insert_entry(
             request.user.id,
@@ -179,11 +189,11 @@ def upload_files(request):
                 # o upload pro Drive — o polling em /files/<id>/status troca
                 # esse valor pelo link do Drive quando status vira "done".
                 "url": temp_public_url,
-                "status": "processing",
+                "status": entry_status,
                 "category": None,
                 "tags": [],
                 "description": "",
-                "task_id": async_result.id,
+                "task_id": task_id,
             },
         )
 
@@ -194,8 +204,8 @@ def upload_files(request):
                 "public_url": temp_public_url,
                 "size_bytes": uploaded_file.size,
                 "content_type": content_type,
-                "status": "processing",
-                "task_id": async_result.id,
+                "status": entry_status,
+                "task_id": task_id,
             }
         )
 
@@ -226,7 +236,15 @@ def add_link(request):
         name = (parsed.netloc + parsed.path).rstrip("/")
 
     entry_id = f"link_{uuid.uuid4().hex[:8]}"
-    async_result = classify_link_task.delay(request.user.id, entry_id, url)
+    try:
+        async_result = classify_link_task.delay(request.user.id, entry_id, url)
+        entry_status = "processing"
+        task_id = async_result.id
+    except Exception as exc:  # noqa: BLE001 - broker fora do ar não pode fazer o link cadastrado
+        # sumir sem deixar rastro (sem isso, a entry nunca era criada).
+        logger.warning("Não foi possível enfileirar a classificação do link '%s': %s", url, exc)
+        entry_status = "error"
+        task_id = None
 
     entry = {
         "id": entry_id,
@@ -236,11 +254,11 @@ def add_link(request):
         "size": 0,
         "created_at": datetime.now(tz=timezone.utc).isoformat(),
         "url": url,
-        "status": "processing",
+        "status": entry_status,
         "category": None,
         "tags": [],
         "description": "",
-        "task_id": async_result.id,
+        "task_id": task_id,
     }
 
     uploaded_files_store.insert_entry(request.user.id, entry)
@@ -371,20 +389,34 @@ def delete_file(request, file_id: str):
         return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
 
     drive_file_id = entry.get("drive_file_id")
-    try:
-        service = google_drive.get_drive_service(request.user)
-        if drive_file_id:
+    service = None
+    if drive_file_id:
+        try:
+            service = google_drive.get_drive_service(request.user)
             google_drive.delete_file(service, drive_file_id)
-    except google_drive.DriveNotConnectedError as exc:
-        return JsonResponse({"success": False, "error": str(exc)}, status=401)
-    except Exception as exc:  # noqa: BLE001 - qualquer falha do Drive vira erro amigável, não 500
-        logger.warning("Falha ao remover '%s' do Drive: %s", file_id, exc)
-        return JsonResponse({"success": False, "error": "Não foi possível remover o arquivo do Drive."}, status=502)
+        except google_drive.DriveNotConnectedError as exc:
+            return JsonResponse({"success": False, "error": str(exc)}, status=401)
+        except Exception as exc:  # noqa: BLE001 - qualquer falha do Drive vira erro amigável, não 500
+            logger.warning("Falha ao remover '%s' do Drive: %s", file_id, exc)
+            return JsonResponse({"success": False, "error": "Não foi possível remover o arquivo do Drive."}, status=502)
+    else:
+        # Nunca chegou a subir pro Drive (ex.: falhou ao enfileirar a
+        # classificação) — o arquivo real, se ainda existir, está só em
+        # media/ como pouso temporário. Sem isso, ele ficava órfão pra
+        # sempre, mesmo depois de "excluído" aqui.
+        local_path = Path(settings.MEDIA_ROOT) / file_id
+        try:
+            local_path.unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            logger.warning("Não foi possível remover o arquivo local '%s': %s", local_path, exc)
 
     registered_files = [f for f in uploaded_files_store.read_all(request.user.id) if f["id"] != file_id]
     uploaded_files_store.write_all(request.user.id, registered_files)
 
     try:
+        service = service or google_drive.get_drive_service(request.user)
         sync_catalog_to_drive(service, request.user.id)
     except Exception as exc:  # noqa: BLE001 - arquivo já foi removido; sincronizar o catálogo é best-effort
         logger.warning("Arquivo removido, mas falhou sincronizar uploaded_files.json: %s", exc)

@@ -100,21 +100,25 @@ else
     smoke_fail=1
 fi
 
-# 3. Worker do Celery respondendo a um ping via broker (algumas tentativas —
-# logo após o container subir, o worker ainda pode estar terminando o
-# handshake inicial com o broker).
+# 3. Worker do Celery respondendo a um ping via broker — rodado a partir do
+# container "web" (não do "worker"), de propósito: o worker conversando com
+# o próprio Redis é só localhost dentro do mesmo container e não prova nada
+# sobre a rede entre containers, que é o caminho que o /upload de verdade
+# usa (CELERY_BROKER_URL=redis://worker:6379/0 visto do lado do web). Já
+# aconteceu do Redis do worker recusar conexão vinda de fora (protected
+# mode) enquanto esse ping "de dentro" continuava respondendo normalmente.
 celery_ok=false
 for _ in $(seq 1 5); do
-    ping_output=$(docker compose exec -T worker celery -A busca_agil inspect ping --timeout 10 2>/dev/null) || true
+    ping_output=$(docker compose exec -T web celery -A busca_agil inspect ping --timeout 10 2>/dev/null) || true
     case "$ping_output" in
         *pong*) celery_ok=true; break ;;
     esac
     sleep 3
 done
 if [ "$celery_ok" = true ]; then
-    echo "  [OK]     Worker do Celery respondendo (broker Redis ok)"
+    echo "  [OK]     Worker respondeu ao ping enviado pelo web (broker acessível pela rede)"
 else
-    echo "  [FALHOU] Worker do Celery não respondeu ao ping"
+    echo "  [FALHOU] Web não conseguiu falar com o worker pelo broker Redis"
     smoke_fail=1
 fi
 
