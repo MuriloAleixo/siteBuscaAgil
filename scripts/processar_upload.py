@@ -29,6 +29,7 @@ Uso programático:
     # }
 """
 
+import logging
 import sys
 from pathlib import Path
 
@@ -38,9 +39,13 @@ if __package__ in (None, ""):
         sys.path.insert(0, str(project_root))
     from scripts.extrator_conteudo import preparar_conteudo
     from scripts.categorizer_gemini import GeminiCategorizer
+    from scripts.local_ai.router import classificar_local, local_ai_habilitada
 else:
     from .extrator_conteudo import preparar_conteudo
     from .categorizer_gemini import GeminiCategorizer
+    from .local_ai.router import classificar_local, local_ai_habilitada
+
+logger = logging.getLogger(__name__)
 
 
 CATEGORIAS_POSSIVEIS = [
@@ -59,7 +64,18 @@ def processar_upload(origem: str) -> dict:
     """
     origem: caminho local do arquivo enviado pelo cliente, OU uma URL.
     Retorna a classificação (categoria, tags, descrição e scores).
+
+    Tenta a IA local (Ollama, ver scripts/local_ai/) primeiro quando
+    LOCAL_AI_ENABLED estiver ligado; qualquer falha (container fora do ar,
+    tipo ainda não suportado localmente etc.) cai pro Gemini, sem mudar o
+    formato do retorno.
     """
+    if local_ai_habilitada():
+        try:
+            return classificar_local(origem, CATEGORIAS_POSSIVEIS)
+        except Exception as exc:  # noqa: BLE001 - IA local é best-effort, cai pro Gemini
+            logger.warning("IA local não conseguiu classificar '%s', caindo pro Gemini: %s", origem, exc)
+
     conteudo = preparar_conteudo(origem)
 
     categorizer = GeminiCategorizer()

@@ -14,7 +14,7 @@ from scripts.processar_upload import processar_upload
 logger = logging.getLogger(__name__)
 
 
-def _sync_catalog_to_drive(service, user_id: int) -> None:
+def sync_catalog_to_drive(service, user_id: int) -> None:
     """Reflete o catálogo local (já atualizado) de volta pro
     uploaded_files.json dentro da pasta do usuário no Drive."""
     profile = DriveProfile.objects.get(user_id=user_id)
@@ -70,7 +70,7 @@ def _run_file_upload(user_id: int, saved_path: str, entry_id: str, original_name
     )
 
     try:
-        _sync_catalog_to_drive(service, user_id)
+        sync_catalog_to_drive(service, user_id)
     except Exception as exc:  # noqa: BLE001 - o arquivo já subiu; sincronizar o catálogo é best-effort
         logger.warning("Arquivo no Drive, mas falhou sincronizar uploaded_files.json: %s", exc)
 
@@ -101,7 +101,7 @@ def _run_link_classification(user_id: int, url: str, entry_id: str) -> None:
     try:
         user = User.objects.get(pk=user_id)
         service = google_drive.get_drive_service(user)
-        _sync_catalog_to_drive(service, user_id)
+        sync_catalog_to_drive(service, user_id)
     except Exception as exc:  # noqa: BLE001 - best-effort
         logger.warning("Não foi possível sincronizar o catálogo com o Drive: %s", exc)
 

@@ -1,21 +1,3 @@
-// =============================================================
-// Utilitários de arquivo ainda simulados no front-end (fora do escopo da
-// autenticação, que agora é real — ver static/js/auth.js). Deletar um
-// arquivo aqui só remove da lista em memória; não há endpoint de exclusão
-// real no backend/Drive ainda.
-// =============================================================
-
-// Simulate file deletion
-async function mockDeleteFile(fileId) {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const idx = MOCK_FILES.findIndex((f) => f.id === fileId);
-      if (idx !== -1) MOCK_FILES.splice(idx, 1);
-      resolve({ success: true });
-    }, 800);
-  });
-}
-
 // Detect file type from File object
 function detectFileType(file) {
   const mime = file.type;

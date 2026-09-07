@@ -282,8 +282,37 @@ function openInDrive() {
   setTimeout(() => window.open(currentFile?.driveUrl || '#', '_blank'), 500);
 }
 
-function simulateDownload() {
-  showToast('Download simulado iniciado com sucesso!', 'success');
+async function downloadFile() {
+  if (!currentFile) return;
+
+  if (currentFile.type === 'link') {
+    showToast('Links não têm arquivo para baixar — use "Acessar URL externa".', 'info');
+    return;
+  }
+
+  showToast('Preparando download...', 'info');
+  try {
+    const url = `${UPLOADED_FILES_API_URL}/${encodeURIComponent(currentFile.id)}/download`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Falha ao baixar (${res.status}).`);
+    }
+
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = currentFile.name || 'arquivo';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(blobUrl);
+
+    showToast('Download iniciado!', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro ao baixar o arquivo.', 'error');
+  }
 }
 
 function copyLink() {
@@ -307,13 +336,22 @@ async function doDelete() {
   btn.textContent = 'Excluindo...';
   btn.disabled = true;
   try {
-    await mockDeleteFile(currentFile.id);
+    const res = await fetch(`${UPLOADED_FILES_API_URL}/${encodeURIComponent(currentFile.id)}/delete`, {
+      method: 'POST',
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || `Falha ao excluir (${res.status}).`);
+    }
+
     closeDeleteModal();
     showToast('Arquivo excluído!', 'success');
     setTimeout(() => { window.location.href = 'dashboard.html'; }, 1200);
   } catch (e) {
     closeDeleteModal();
-    showToast('Erro ao excluir.', 'error');
+    showToast(e.message || 'Erro ao excluir.', 'error');
+    btn.textContent = 'Excluir';
+    btn.disabled = false;
   }
 }
 

@@ -177,6 +177,25 @@ def upload_file(service, folder_id: str, local_path: str, filename: str, mimetyp
     return {"file_id": created["id"], "web_view_link": created.get("webViewLink")}
 
 
+def download_file(service, file_id: str) -> tuple[bytes, str, str]:
+    """Baixa o conteúdo real de um arquivo (não o catálogo) da pasta do app.
+    Retorna (conteudo, nome, mimetype)."""
+    meta = service.files().get(fileId=file_id, fields="name, mimeType").execute()
+
+    buffer = io.BytesIO()
+    request = service.files().get_media(fileId=file_id)
+    downloader = MediaIoBaseDownload(buffer, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+
+    return (
+        buffer.getvalue(),
+        meta.get("name", "arquivo"),
+        meta.get("mimeType") or "application/octet-stream",
+    )
+
+
 def delete_file(service, file_id: str) -> None:
     try:
         service.files().delete(fileId=file_id).execute()

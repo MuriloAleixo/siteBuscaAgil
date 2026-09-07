@@ -5,20 +5,22 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import FileSystemStorage
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from core import google_drive, uploaded_files_store
 from core.models import DriveProfile
-from core.tasks import classify_and_catalog_task, classify_link_task
+from core.tasks import classify_and_catalog_task, classify_link_task, sync_catalog_to_drive
 from scripts.analisador_busca import BuscaAnalyzer
+from scripts.local_ai.busca_analyzer_local import LocalBuscaAnalyzer
+from scripts.local_ai.router import local_ai_habilitada
 from scripts.processar_upload import CATEGORIAS_POSSIVEIS
 
 logger = logging.getLogger(__name__)
@@ -315,6 +317,76 @@ def file_status(request, file_id: str):
     return response
 
 
+@login_required
+@require_http_methods(["GET"])
+def download_file(request, file_id: str):
+    """Baixa o conteúdo real do arquivo do Drive do usuário e devolve como
+    anexo (Content-Disposition), em vez de mandar o usuário pro visualizador
+    do Drive (webViewLink). Links não têm arquivo físico associado."""
+    entry = uploaded_files_store.get_entry(request.user.id, file_id)
+    if entry is None:
+        return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
+
+    drive_file_id = entry.get("drive_file_id")
+    if entry.get("type") == "link" or not drive_file_id:
+        return JsonResponse(
+            {"success": False, "error": "Este item não possui um arquivo para baixar."}, status=400
+        )
+
+    try:
+        service = google_drive.get_drive_service(request.user)
+        content, drive_name, mimetype = google_drive.download_file(service, drive_file_id)
+    except google_drive.DriveNotConnectedError as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=401)
+    except Exception as exc:  # noqa: BLE001 - qualquer falha do Drive vira erro amigável, não 500
+        logger.warning("Falha ao baixar '%s' do Drive: %s", file_id, exc)
+        return JsonResponse(
+            {"success": False, "error": "Não foi possível baixar o arquivo do Drive."}, status=502
+        )
+
+    filename = entry.get("name") or drive_name
+    response = HttpResponse(content, content_type=mimetype)
+    response["Content-Length"] = str(len(content))
+    # filename= (ASCII, fallback) + filename*= (UTF-8, RFC 5987) para nomes com acentos.
+    ascii_fallback = filename.encode("ascii", "ignore").decode("ascii") or "arquivo"
+    response["Content-Disposition"] = (
+        f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{quote(filename)}'
+    )
+    return response
+
+
+@csrf_exempt
+@login_required
+@require_http_methods(["POST"])
+def delete_file(request, file_id: str):
+    """Remove o arquivo do Drive do usuário (se houver) e do catálogo local,
+    sincronizando o uploaded_files.json de volta pro Drive em seguida."""
+    entry = uploaded_files_store.get_entry(request.user.id, file_id)
+    if entry is None:
+        return JsonResponse({"success": False, "error": "Arquivo não encontrado."}, status=404)
+
+    drive_file_id = entry.get("drive_file_id")
+    try:
+        service = google_drive.get_drive_service(request.user)
+        if drive_file_id:
+            google_drive.delete_file(service, drive_file_id)
+    except google_drive.DriveNotConnectedError as exc:
+        return JsonResponse({"success": False, "error": str(exc)}, status=401)
+    except Exception as exc:  # noqa: BLE001 - qualquer falha do Drive vira erro amigável, não 500
+        logger.warning("Falha ao remover '%s' do Drive: %s", file_id, exc)
+        return JsonResponse({"success": False, "error": "Não foi possível remover o arquivo do Drive."}, status=502)
+
+    registered_files = [f for f in uploaded_files_store.read_all(request.user.id) if f["id"] != file_id]
+    uploaded_files_store.write_all(request.user.id, registered_files)
+
+    try:
+        sync_catalog_to_drive(service, request.user.id)
+    except Exception as exc:  # noqa: BLE001 - arquivo já foi removido; sincronizar o catálogo é best-effort
+        logger.warning("Arquivo removido, mas falhou sincronizar uploaded_files.json: %s", exc)
+
+    return JsonResponse({"success": True})
+
+
 def _file_matches(entry: dict, categories: list[str], tags: list[str], query_lower: str) -> bool:
     file_category = (entry.get("category") or "").lower()
     file_tags = [t.lower() for t in (entry.get("tags") or [])]
@@ -360,13 +432,22 @@ def smart_search(request):
 
     categories: list[str] = []
     tags: list[str] = []
-    try:
-        analyzer = BuscaAnalyzer()
-        analise = analyzer.analisar(query, CATEGORIAS_POSSIVEIS, known_tags)
+    analise = None
+    if local_ai_habilitada():
+        try:
+            analise = LocalBuscaAnalyzer().analisar(query, CATEGORIAS_POSSIVEIS, known_tags)
+        except Exception as exc:  # noqa: BLE001 - IA local é best-effort, cai pro Gemini
+            logger.warning("IA local não conseguiu analisar a busca '%s', caindo pro Gemini: %s", query, exc)
+
+    if analise is None:
+        try:
+            analise = BuscaAnalyzer().analisar(query, CATEGORIAS_POSSIVEIS, known_tags)
+        except Exception as exc:  # noqa: BLE001 - busca assistida é best-effort
+            logger.warning("Não foi possível analisar a busca '%s' via Gemini: %s", query, exc)
+
+    if analise is not None:
         categories = [c.strip().lower() for c in analise.categorias if c.strip()]
         tags = [t.strip().lower() for t in analise.tags if t.strip()]
-    except Exception as exc:  # noqa: BLE001 - busca assistida é best-effort
-        logger.warning("Não foi possível analisar a busca '%s' via Gemini: %s", query, exc)
 
     query_lower = query.lower()
     matched = [f for f in all_files if _file_matches(f, categories, tags, query_lower)]

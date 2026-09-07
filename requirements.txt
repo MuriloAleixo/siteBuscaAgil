@@ -22,5 +22,14 @@ google-auth==2.56.3
 PyJWT==2.13.0
 cryptography==50.0.0
 
+# IA local (Ollama) - classificacao de PDF/video/audio sem depender do Gemini
+pypdf==6.17.0
+pypdfium2==5.13.0
+Pillow==12.3.0
+faster-whisper==1.2.1
+
 # Para ler arquivos .doc legados, instale tambem no sistema:
 # sudo apt-get install antiword
+
+# Para extrair frames de video/audio na IA local, instale tambem no sistema:
+# sudo apt-get install ffmpeg

@@ -1,6 +1,13 @@
 # siteBuscaAgil
 
-Site para buscar suas anotações e arquivos de maneira simples e fácil.
+Site para buscar suas anotações e arquivos de maneira simples e fácil. Login
+exclusivamente com Google, arquivos guardados no seu próprio Google Drive, e
+classificação automática (categoria/tags/descrição) via IA — local (Ollama)
+ou Gemini.
+
+Pra aprender a **usar** o sistema (login, upload, busca, editar
+classificação, excluir arquivos), veja **[GUIA_DE_USO.md](GUIA_DE_USO.md)**.
+Este documento aqui é só sobre **instalar e rodar** o projeto.
 
 ## Estrutura Do Projeto
 
@@ -9,7 +16,7 @@ O projeto segue o padrão Django:
 - `manage.py` na raiz
 - pacote de projeto em `busca_agil/`
 - app principal em `core/`
-- utilitários em `scripts/`
+- utilitários/IA em `scripts/`
 - templates em `templates/`
 - assets estáticos em `static/`
 - pouso temporário de upload em `media/` (arquivo some de lá assim que o worker confirma o envio pro Drive)
@@ -17,105 +24,108 @@ O projeto segue o padrão Django:
 
 Dentro de `core/`, vale destacar:
 
-- `views.py` — rotas HTTP (páginas, upload, busca, `post_login_sync`)
+- `views.py` — rotas HTTP (páginas, upload, busca, exclusão, `post_login_sync`)
 - `tasks.py` — tarefas assíncronas do Celery (classificação + upload pro Drive)
-- `google_drive.py` — toda a integração com a Drive API (pasta do usuário, catálogo, upload/download de arquivos)
+- `google_drive.py` — toda a integração com a Drive API (pasta do usuário, catálogo, upload/download/exclusão de arquivos)
 - `models.py` — `DriveProfile`, guarda os IDs da pasta/catálogo de cada usuário no Drive
 - `context_processors.py` — injeta os dados do usuário logado (nome, avatar, cota de armazenamento) em todo template
 - `uploaded_files_store.py` — leitura/escrita do cache local por usuário, com lock de arquivo
 
-`server.py` não é mais necessário. O ponto de entrada padrão do Django é o
-`manage.py`. Veja `SISTEMA_DISTRIBUIDO.md` para uma explicação mais
-detalhada de como essas peças conversam entre si (fila Redis, worker
-Celery, Drive como fonte da verdade, cache local por usuário).
+Dentro de `scripts/`:
 
-## Como Subir No WSL Do Windows
+- `processar_upload.py` — orquestrador: tenta a IA local primeiro (se
+  habilitada), cai pro Gemini em qualquer falha
+- `local_ai/` — IA local via Ollama (texto, imagem/PDF, vídeo/áudio, busca)
+- `categorizer_gemini.py` / `analisador_busca.py` — classificação e busca via Gemini (nuvem)
+- `extrator_conteudo.py` — extração de texto de documentos/planilhas
 
-### 1. Instalar o WSL com Ubuntu
+O login com Google já autoriza, no mesmo consentimento, o acesso a uma pasta
+própria (`buscaagil_upload`) no Drive do usuário — é lá que os arquivos
+enviados e o catálogo (`uploaded_files.json`) ficam guardados de verdade.
+Local (`media/`, `data/users/`) é só um pouso temporário/cache.
 
-No PowerShell do Windows, execute:
+## Instalação
 
-```powershell
-wsl --install
-```
+### 1. Pré-requisitos: WSL + Git (Windows)
 
-Se quiser instalar direto o Ubuntu:
+Se já tem WSL com Ubuntu e o repositório clonado, pule pra
+[Rodar Com Docker](#2-rodar-com-docker-recomendado).
+
+No PowerShell do Windows:
 
 ```powershell
 wsl --install -d Ubuntu
 ```
 
-Depois reinicie o Windows se for solicitado. Ao abrir o Ubuntu pela primeira vez, crie o usuário e a senha do Linux.
+Reinicie o Windows se for solicitado. Ao abrir o Ubuntu pela primeira vez,
+crie o usuário e a senha do Linux, e rode os comandos abaixo dali em diante.
 
-### 2. Abrir o Ubuntu no WSL
-
-Abra o app Ubuntu ou use o Windows Terminal com a distribuição Ubuntu. A partir daqui, os comandos abaixo devem ser executados no Linux do WSL.
-
-### 3. Criar a chave SSH no Linux
-
-Se você ainda não tem uma chave SSH no WSL, gere uma nova:
+Se ainda não tiver uma chave SSH associada à sua conta GitHub:
 
 ```bash
 ssh-keygen -t ed25519 -C "seu_email@exemplo.com"
+cat ~/.ssh/id_ed25519.pub   # copie e adicione em GitHub > Settings > SSH and GPG keys
+ssh -T git@github.com       # testa a conexão
 ```
 
-Pressione `Enter` para aceitar o caminho padrão e, se quiser, use uma senha para proteger a chave.
-
-### 4. Copiar a chave pública para o GitHub
-
-Mostre a chave pública com:
-
-```bash
-cat ~/.ssh/id_ed25519.pub
-```
-
-Copie o conteúdo inteiro e adicione em:
-
-GitHub > Settings > SSH and GPG keys > New SSH key
-
-Depois teste a conexão:
-
-```bash
-ssh -T git@github.com
-```
-
-Se tudo estiver certo, o GitHub deve responder com uma mensagem de autenticação.
-
-### 5. Baixar o projeto do GitHub
-
-Entre na pasta onde deseja clonar e execute:
+Clone o projeto:
 
 ```bash
 git clone git@github.com:MuriloAleixo/siteBuscaAgil.git
 cd siteBuscaAgil
 ```
 
-Se o projeto já estiver aberto dentro do WSL, basta entrar na pasta do repositório.
+### 2. Rodar Com Docker (Recomendado)
 
-## Criar Ambiente E Instalar Bibliotecas
+Com Docker instalado (Docker Desktop com integração WSL, ou Docker Engine
+direto no WSL) mais o plugin `docker compose`, todo o resto — Django, worker
+do Celery, Redis e a IA local (Ollama) — sobe com um único script, sem
+precisar instalar Python/venv/Redis/ffmpeg no seu WSL.
 
-Recomenda-se criar um ambiente virtual Python no WSL:
+1. Configure as credenciais no `.env` (seções **3** e **4** abaixo — os
+   passos de configuração de chave são os mesmos, só quem roda o processo
+   muda).
+2. Rode:
+
+   ```bash
+   ./setup.sh
+   ```
+
+O script builda as imagens, sobe o Ollama, baixa os modelos de IA local,
+roda as migrações, sobe o Django e o worker e, ao final, roda uma bateria
+de **smoke tests** (Ollama respondendo com os modelos certos, Django
+respondendo em `:8000`, worker do Celery respondendo a um ping via broker,
+e uma classificação de arquivo de ponta a ponta) — se algum teste crítico
+falhar, o script para e mostra o que verificar. Se tudo passar, acesse
+`http://localhost:8000/`.
+
+Comandos do dia a dia depois da primeira vez:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
+docker compose up -d      # subir tudo de novo
+docker compose logs -f    # acompanhar os logs
+docker compose down       # parar tudo
 ```
 
-Depois instale as dependências:
+Pra desfazer tudo (containers, imagens, volumes com os modelos baixados,
+`db.sqlite3`, cache local) e voltar a um estado zerado — só com o código e
+os arquivos de configuração/instrução, pronto pra rodar `./setup.sh` de
+novo do zero:
 
 ```bash
-pip install -r requirements.txt
+./uninstall.sh
 ```
 
-Se o sistema reclamar de dependências de leitura de `.doc`, instale também o pacote de sistema:
+O script pergunta antes de cada passo destrutivo, inclusive se quer apagar
+o `.env` (suas chaves do Gemini/Google) ou mantê-lo.
 
-```bash
-sudo apt-get install antiword
-```
+Se preferir configurar cada peça manualmente (sem Docker) — útil pra
+depurar direto —, veja [Rodar Manualmente (Sem Docker)](#6-rodar-manualmente-sem-docker)
+mais abaixo. As seções **3**, **4** e **5** valem pros dois jeitos de rodar.
 
-## Configurar Variáveis De Ambiente
+### 3. Configurar Variáveis De Ambiente
 
-Copie o arquivo de exemplo e preencha com sua chave:
+Copie o arquivo de exemplo:
 
 ```bash
 cp .env.example .env
@@ -127,9 +137,9 @@ Edite o `.env` e defina:
 GEMINI_API_KEY=sua_chave_aqui
 ```
 
-Gere uma chave gratuita em https://aistudio.google.com/apikey. Sem essa chave o
-site continua funcional, apenas sem a classificação automática de arquivos
-(veja `DOCUMENTACAO.md`).
+Gere uma chave gratuita em https://aistudio.google.com/apikey. Sem essa
+chave o site continua funcional (com a IA local, se habilitada — seção 5 —
+ou sem classificação automática).
 
 Opcionalmente, também é possível sobrescrever a conexão do Celery/Redis
 definindo no `.env`:
@@ -139,137 +149,174 @@ CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/0
 ```
 
-Se não forem definidas, esses são os valores padrão já usados pelo projeto.
+Se não forem definidas, esses são os valores padrão já usados pelo projeto
+(no fluxo Docker, o próprio `docker-compose.yml` já sobrescreve isso pra
+apontar pro serviço certo — não precisa mexer).
 
-## Configurar Login E Drive Com O Google
+### 4. Configurar Login E Drive Com O Google
 
 O login do BuscaÁgil é feito **exclusivamente com conta Google** — não existe
 usuário/senha local. No mesmo consentimento, o Google já pede autorização
-pro BuscaÁgil acessar uma pasta própria (`buscaagil_upload`) no Drive do
-usuário: é lá que os arquivos enviados e o catálogo (`uploaded_files.json`)
-de cada usuário ficam guardados. Local (`media/`, `data/users/`) é só um
-pouso temporário/cache — veja `SISTEMA_DISTRIBUIDO.md` para o desenho
-completo.
+pro BuscaÁgil acessar a pasta `buscaagil_upload` no Drive do usuário.
 
 Pra isso funcionar, você precisa criar um **Client ID OAuth** no Google
 Cloud Console:
 
-### 1. Criar um projeto no Google Cloud Console
+1. **Criar um projeto** em https://console.cloud.google.com/ (ou usar um existente).
+2. **Ativar a API do Drive**: menu > **APIs e serviços > Biblioteca** > procure **Google Drive API** > **Ativar**.
+3. **Configurar a tela de consentimento OAuth** (**APIs e serviços > Tela de consentimento OAuth**):
+   - Tipo de usuário: **Externo** (ou **Interno**, se for Google Workspace).
+   - Preencha nome do app, e-mail de suporte e e-mail de contato do desenvolvedor.
+   - Em **Escopos**, adicione `.../auth/userinfo.email`, `.../auth/userinfo.profile`
+     e `https://www.googleapis.com/auth/drive.file` (acesso só aos arquivos
+     que o próprio BuscaÁgil cria — não ao Drive inteiro do usuário).
+   - Enquanto o app estiver em modo **Teste**, adicione as contas Google que
+     vão logar (incluindo a sua) em **Usuários de teste**.
+4. **Criar as credenciais** (**APIs e serviços > Credenciais > Criar credenciais > ID do cliente OAuth**):
+   - Tipo de aplicativo: **Aplicativo da Web**.
+   - **Origens JavaScript autorizadas**: `http://localhost:8000`
+   - **URIs de redirecionamento autorizados**: `http://localhost:8000/accounts/google/login/callback/`
 
-Acesse https://console.cloud.google.com/, crie um projeto novo (ou use um
-existente) e selecione-o no seletor do topo da página.
+   Ao salvar, o Google mostra o **Client ID** e o **Client Secret**.
+5. **Colar no `.env`**:
 
-### 2. Ativar a API do Google Drive
+   ```text
+   GOOGLE_OAUTH_CLIENT_ID=algo.apps.googleusercontent.com
+   GOOGLE_OAUTH_CLIENT_SECRET=sua_client_secret
+   ```
+6. **Rodar as migrações** (o login com Google usa tabelas do `django-allauth`):
 
-No menu, vá em **APIs e serviços > Biblioteca**, procure por **Google Drive
-API** e clique em **Ativar**.
+   ```bash
+   python manage.py migrate
+   ```
 
-### 3. Configurar a tela de consentimento OAuth
+   (No fluxo Docker, o `web` já roda isso sozinho ao subir — não precisa repetir.)
 
-Em **APIs e serviços > Tela de consentimento OAuth**:
+> **Atenção ao host usado no navegador**: as credenciais acima só valem para
+> `http://localhost:8000/`. Se você abrir o site em `http://127.0.0.1:8000/`
+> em vez de `localhost`, o login falha com `redirect_uri_mismatch` (pro
+> Google, são origens diferentes) — use sempre `localhost`, ou cadastre
+> `127.0.0.1` também nas credenciais.
 
-- Tipo de usuário: **Externo** (ou **Interno**, se for Google Workspace).
-- Preencha nome do app, e-mail de suporte e e-mail de contato do
-  desenvolvedor.
-- Em **Escopos**, adicione:
-  - `.../auth/userinfo.email`
-  - `.../auth/userinfo.profile`
-  - `https://www.googleapis.com/auth/drive.file` (acesso só aos arquivos
-    que o próprio BuscaÁgil cria — não ao Drive inteiro do usuário)
-- Enquanto o app estiver em modo **Teste**, adicione as contas Google que
-  vão logar (incluindo a sua) em **Usuários de teste**.
+### 5. Configurar IA Local (Ollama)
 
-### 4. Criar as credenciais (Client ID OAuth)
+Por padrão (`LOCAL_AI_ENABLED=true` no `.env`), a classificação de arquivos e
+o entendimento da busca tentam rodar **localmente**, num container Ollama
+(CPU, sem depender de internet nem gastar cota do Gemini), e só caem pro
+Gemini se o container estiver fora do ar ou o modelo local falhar. Pra
+desligar de vez e usar só o Gemini, defina `LOCAL_AI_ENABLED=false` no
+`.env`.
 
-Em **APIs e serviços > Credenciais > Criar credenciais > ID do cliente
-OAuth**:
+Se você já rodou `./setup.sh` (seção 2), os passos abaixo já foram feitos
+automaticamente — pule direto pra **"Como funciona o roteamento"**. Os
+comandos abaixo servem pra quem quiser rodar na mão (fluxo manual, ou pra
+trocar de modelo depois).
 
-- Tipo de aplicativo: **Aplicativo da Web**.
-- **Origens JavaScript autorizadas**: `http://localhost:8000`
-- **URIs de redirecionamento autorizados**:
-  `http://localhost:8000/accounts/google/login/callback/`
-
-Ao salvar, o Google mostra o **Client ID** e o **Client Secret**.
-
-### 5. Colar as credenciais no `.env`
-
-```text
-GOOGLE_OAUTH_CLIENT_ID=algo.apps.googleusercontent.com
-GOOGLE_OAUTH_CLIENT_SECRET=sua_client_secret
-```
-
-### 6. Rodar as migrações
-
-O login com Google usa tabelas do Django (`django-allauth`) que ainda não
-existiam antes — rode (ou re-rode) as migrações depois de configurar isso:
+**1. Subir o container do Ollama** (no fluxo manual, só o serviço `ollama` —
+o `docker-compose.yml` também define `web`/`worker`, usados pelo
+`./setup.sh`):
 
 ```bash
-python manage.py migrate
+docker compose up -d ollama
 ```
 
-## Instalar E Rodar O Redis
+**2. Baixar os modelos** (uma vez só, ficam salvos no volume do container):
 
-O upload de arquivos usa o Celery para processar a classificação em segundo
-plano, e o Celery precisa de um broker Redis rodando. Instale e inicie o
-Redis no WSL:
+```bash
+docker compose exec ollama ollama pull qwen2.5:3b-instruct
+docker compose exec ollama ollama pull moondream
+```
+
+- `qwen2.5:3b-instruct`: classifica texto/documentos e interpreta a busca
+  (mesmo papel que o Gemini faz hoje).
+- `moondream`: modelo de visão leve (~1.8B, roda bem em CPU) — descreve
+  imagens e frames de vídeo/páginas de PDF escaneado em texto, que depois é
+  classificado pelo modelo de texto acima.
+
+**3. Instalar o `ffmpeg`** (necessário só pra vídeo/áudio; já vem embutido
+na imagem Docker do `web`/`worker`, só é preciso instalar manualmente no
+fluxo sem Docker):
+
+```bash
+sudo apt-get install -y ffmpeg
+```
+
+Sem isso, arquivos de vídeo/áudio continuam funcionando (upload normal pro
+Drive), só não ficam com categoria/tags/descrição.
+
+**Como funciona o roteamento** — cada arquivo enviado é roteado
+automaticamente pro tratamento certo, pela extensão:
+
+- **Texto/planilha/documento** (`.txt`, `.csv`, `.xlsx`, `.docx` etc.) →
+  extraído como texto e classificado direto pelo modelo de texto.
+- **Imagem/PDF** (`.jpg`, `.png`, `.pdf`) → o `moondream` gera uma legenda da
+  imagem (ou renderiza as primeiras páginas do PDF, se ele não tiver texto
+  extraível — PDF escaneado) e o modelo de texto classifica essa legenda.
+- **Vídeo/áudio** (`.mp4`, `.mov`, `.mp3` etc.) → o áudio é transcrito
+  (`faster-whisper`) e, no caso de vídeo, 3 frames representativos também
+  viram legenda via `moondream`; tudo isso junto é classificado pelo modelo
+  de texto. Essa é uma capacidade nova — hoje vídeo/áudio não são
+  classificados nem pelo Gemini.
+
+### 6. Rodar Manualmente (Sem Docker)
+
+Alternativa a `./setup.sh` pra quem quiser rodar cada peça na mão, direto no
+WSL. As seções 3, 4 e 5 (credenciais) valem pros dois jeitos de rodar.
+
+**Criar ambiente e instalar bibliotecas:**
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+Se o sistema reclamar de dependências de leitura de `.doc`, instale também:
+
+```bash
+sudo apt-get install antiword
+```
+
+**Instalar e rodar o Redis** (broker do Celery):
 
 ```bash
 sudo apt-get install -y redis-server
 sudo service redis-server start
+redis-cli ping   # deve responder PONG
 ```
 
-Verifique se está no ar:
+Como o WSL não usa `systemd` por padrão, o Redis precisa ser iniciado
+manualmente com `sudo service redis-server start` toda vez que o WSL for
+reiniciado.
 
-```bash
-redis-cli ping
-```
-
-Deve responder `PONG`. Como o WSL não usa `systemd` por padrão, o Redis
-precisa ser iniciado manualmente com `sudo service redis-server start` toda
-vez que o WSL for reiniciado.
-
-## Rodar As Migrações Do Banco
-
-Com o ambiente virtual ativo:
+**Rodar as migrações do banco:**
 
 ```bash
 python manage.py migrate
 ```
 
-## Rodar O Worker Do Celery
-
-Em um terminal separado (com o ambiente virtual ativo e o Redis já rodando),
-suba o worker que processa o upload em segundo plano:
+**Rodar o worker do Celery** (terminal separado, deixe aberto):
 
 ```bash
 celery -A busca_agil worker --loglevel=info
 ```
 
-Deixe esse terminal aberto enquanto for testar uploads.
-
-## Rodar O Projeto
-
-Em outro terminal, com o ambiente virtual ativo, inicie o Django:
+**Rodar o projeto** (outro terminal):
 
 ```bash
 python manage.py runserver
 ```
 
-Depois abra no navegador:
+Depois abra `http://localhost:8000/` no navegador.
 
-```text
-http://127.0.0.1:8000/
-```
-
-## Resumo Para Rodar No Dia A Dia
-
-Depois que o ambiente já estiver configurado uma vez, o fluxo do dia a dia é:
+**Resumo do dia a dia**, depois que o ambiente já estiver configurado uma vez:
 
 ```bash
 sudo service redis-server start        # 1. Redis
-source venv/bin/activate               # 2. ambiente virtual
-celery -A busca_agil worker --loglevel=info   # 3. worker (terminal separado)
-python manage.py runserver             # 4. servidor Django (outro terminal)
+docker compose up -d ollama            # 2. IA local (Ollama)
+source venv/bin/activate               # 3. ambiente virtual
+celery -A busca_agil worker --loglevel=info   # 4. worker (terminal separado)
+python manage.py runserver             # 5. servidor Django (outro terminal)
 ```
 
 ## Checklist De Produção
@@ -295,7 +342,7 @@ servidor real:
    em `busca_agil/settings.py`) se `DJANGO_SECRET_KEY` ou
    `DJANGO_ALLOWED_HOSTS` não estiverem definidas — isso é proposital, pra
    nunca subir em produção com os valores de desenvolvimento por engano.
-3. **Atualize as credenciais OAuth do Google** (seção acima) com a URI de
+3. **Atualize as credenciais OAuth do Google** (seção 4) com a URI de
    redirecionamento do domínio real:
    `https://seudominio.com.br/accounts/google/login/callback/` — e mova o
    app de "Teste" pra "Em produção" na tela de consentimento OAuth.
@@ -311,37 +358,25 @@ servidor real:
    Django puro (sessões, contas Google), mas considere Postgres se o
    volume de usuários crescer.
 
-## Observações Importantes
+## Solução De Problemas
 
-- Use o terminal do Ubuntu no WSL para todos os comandos Python, Git e pip.
-- Os arquivos enviados pela tela de upload ficam em `media/`.
-- Os scripts auxiliares de categorização estão em `scripts/`.
-- Se você mudar o código e o servidor estiver rodando, o Django recarrega automaticamente na maioria dos casos.
 - Se o upload retornar erro 500 com `redis.exceptions.ConnectionError`, o
-  Redis não está rodando — repita `sudo service redis-server start`.
+  Redis não está rodando (fluxo manual) — repita
+  `sudo service redis-server start`, ou no Docker confira
+  `docker compose logs worker`.
 - Se o upload for aceito mas o arquivo ficar travado com status
   `"processing"` para sempre (nunca vira `"done"` nem `"error"`), o worker
-  do Celery não está rodando. A tarefa fica enfileirada no Redis esperando
-  um worker consumi-la. Abra um terminal e rode
-  `celery -A busca_agil worker --loglevel=info` (passo 3 do resumo acima).
+  do Celery não está rodando/consumindo — no fluxo manual, rode
+  `celery -A busca_agil worker --loglevel=info`; no Docker, confira
+  `docker compose ps` e `docker compose logs worker`.
 - Sem `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` configurados, o
   botão "Continuar com Google" redireciona pro Google e volta com erro —
-  configure as credenciais (seção "Configurar Login E Drive Com O Google").
+  configure as credenciais (seção 4).
+- Erro `redirect_uri_mismatch` no login: veja o aviso no fim da seção 4
+  (host `localhost` vs `127.0.0.1`).
 - Se o login funcionar mas cair na tela "Não foi possível conectar ao seu
   Google Drive" (`auth.html`), o token do Google não tem o escopo do Drive
-  (geralmente porque o consentimento foi negado ou o app ainda está em modo
-  Teste sem a conta autorizada como usuário de teste). Use o botão de
-  "Tentar de novo" na própria tela, que força o Google a pedir consentimento
-  de novo (`prompt=consent`).
-- Os arquivos enviados agora vão pro Google Drive do usuário (pasta
-  `buscaagil_upload`), não ficam permanentemente em `media/` — esse
-  diretório só guarda uma cópia temporária enquanto o worker Celery
-  classifica e sobe o arquivo. Da mesma forma, `data/users/<id>.json` é só
-  um cache local do catálogo; a fonte da verdade é o `uploaded_files.json`
-  dentro da pasta do usuário no Drive.
-- `static/js/auth.js` é quem fala com o login real (Google/allauth);
-  `static/js/file-utils.js` tem utilitários de arquivo que ainda não têm
-  backend real (`detectFileType`, exclusão simulada de arquivo);
-  `static/js/catalog-client.js` busca o catálogo real em `/files`. O antigo
-  `data/uploaded_files.json` (catálogo global, pré-login) foi removido —
-  cada usuário tem o seu em `data/users/<id>.json`.
+  (geralmente porque o consentimento foi negado, ou o app ainda está em modo
+  Teste sem a conta autorizada como usuário de teste). Use o botão
+  "Tentar de novo / reconceder acesso" na própria tela, que força o Google a
+  pedir consentimento de novo (`prompt=consent`).

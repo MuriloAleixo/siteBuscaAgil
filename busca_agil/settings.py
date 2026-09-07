@@ -13,7 +13,7 @@ load_dotenv(BASE_DIR / ".env")
 # DJANGO_ALLOWED_HOSTS no .env (ou nas variáveis de ambiente do servidor).
 # Sem isso, o projeto continua rodando com valores de desenvolvimento —
 # nunca suba com DEBUG=true ou com a SECRET_KEY padrão em produção.
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-busca-agil-dev-key")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or "django-insecure-busca-agil-dev-key"
 DEBUG = os.environ.get("DJANGO_DEBUG", "true").strip().lower() in ("1", "true", "yes", "on")
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h.strip()]
 
