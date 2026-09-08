@@ -46,6 +46,13 @@ if not DEBUG:
         "1", "true", "yes", "on",
     )
 
+# Só confie no header X-Forwarded-Proto se houver de fato um proxy (Nginx
+# etc.) na frente terminando TLS e reescrevendo esse header — sem um proxy
+# real, um client poderia forjar o header e enganar request.is_secure().
+# Defina DJANGO_BEHIND_PROXY=true no .env só nesse cenário.
+if os.environ.get("DJANGO_BEHIND_PROXY", "false").strip().lower() in ("1", "true", "yes", "on"):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -63,6 +70,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serve /static/ direto do processo Django (comprimido, com cache
+    # headers corretos) — dispensa configurar isso num Nginx separado só
+    # pra estático. Precisa vir logo depois do SecurityMiddleware.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -162,9 +173,22 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+# Destino do `collectstatic` em produção (WhiteNoise serve daqui, não de
+# STATICFILES_DIRS) — não existe em dev, onde o Django serve STATICFILES_DIRS
+# direto sem precisar coletar nada.
+STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 # Use a string for MEDIA_ROOT to avoid pathlib/storage edge-cases
 MEDIA_ROOT = str(BASE_DIR / "media")
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    # Compressão gzip/brotli sem manifest de cache-busting — o manifest
+    # (ManifestStaticFilesStorage) quebra com 500 se qualquer referência no
+    # template/CSS não bater exatamente com um arquivo coletado; pro porte
+    # deste projeto, a versão sem manifest é mais resiliente.
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

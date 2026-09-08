@@ -30,6 +30,7 @@ Dentro de `core/`, vale destacar:
 - `models.py` — `DriveProfile`, guarda os IDs da pasta/catálogo de cada usuário no Drive
 - `context_processors.py` — injeta os dados do usuário logado (nome, avatar, cota de armazenamento) em todo template
 - `uploaded_files_store.py` — leitura/escrita do cache local por usuário, com lock de arquivo
+- `text_match.py` — critério único de busca (normalização de acento + fuzzy matching via `rapidfuzz`), usado tanto pelo filtro no backend quanto (portado em JS) pelo fallback local do frontend
 
 Dentro de `scripts/`:
 
@@ -322,8 +323,8 @@ python manage.py runserver             # 5. servidor Django (outro terminal)
 ## Checklist De Produção
 
 Por padrão o projeto sobe em **modo desenvolvimento** (`DJANGO_DEBUG=true`,
-`ALLOWED_HOSTS=["*"]`, chave secreta de exemplo). Antes de subir num
-servidor real:
+`ALLOWED_HOSTS=["*"]`, chave secreta de exemplo, servidor de desenvolvimento
+do Django). Antes de subir num servidor real:
 
 1. **Gere uma `SECRET_KEY` de verdade** e defina no `.env`:
    ```bash
@@ -346,17 +347,61 @@ servidor real:
    redirecionamento do domínio real:
    `https://seudominio.com.br/accounts/google/login/callback/` — e mova o
    app de "Teste" pra "Em produção" na tela de consentimento OAuth.
-4. **Não use `python manage.py runserver` em produção** — é um servidor de
-   desenvolvimento. Use um servidor WSGI/ASGI real (Gunicorn, uWSGI,
-   Daphne/Uvicorn) atrás de um proxy (Nginx), servindo os arquivos de
-   `static/` diretamente pelo proxy ou via `collectstatic` +
-   [WhiteNoise](https://whitenoise.readthedocs.io/).
-5. **Redis e o worker Celery** precisam rodar como serviços supervisionados
-   (systemd, supervisor, Docker) — não em terminais soltos como no
-   desenvolvimento.
-6. **Banco de dados**: `db.sqlite3` é suficiente para o volume de uso do
+4. **Suba com o servidor de produção (Gunicorn), não o `runserver`**: use o
+   override `docker-compose.prod.yml` (já pronto no repo) junto com o
+   principal:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   ```
+   Isso troca o `command` do `web` por Gunicorn (3 workers) e roda
+   `collectstatic` antes de subir — os arquivos de `static/` passam a ser
+   servidos comprimidos pelo próprio processo Django via
+   [WhiteNoise](https://whitenoise.readthedocs.io/) (`STATIC_ROOT`/`STORAGES`
+   em `busca_agil/settings.py`), sem precisar configurar isso num proxy à
+   parte.
+5. **Coloque um proxy reverso (Nginx) na frente** pra TLS/domínio — exemplo
+   mínimo:
+   ```nginx
+   server {
+       listen 443 ssl;
+       server_name seudominio.com.br;
+       # ssl_certificate / ssl_certificate_key (ex.: Let's Encrypt / certbot)
+
+       location / {
+           proxy_pass http://127.0.0.1:8000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Forwarded-Proto $scheme;
+           proxy_set_header X-Real-IP $remote_addr;
+       }
+   }
+   ```
+   Com um proxy desses de fato na frente terminando TLS, defina também
+   `DJANGO_BEHIND_PROXY=true` no `.env` — sem isso, `request.is_secure()`
+   fica errado e pode gerar loop de redirecionamento com
+   `DJANGO_SECURE_SSL_REDIRECT=true`. **Não** ative `DJANGO_BEHIND_PROXY` se
+   o Django for acessado diretamente (sem proxy), pois o header que ele
+   passa a confiar (`X-Forwarded-Proto`) pode ser forjado por qualquer
+   client nesse caso.
+6. **Redis e o worker Celery** já rodam como serviços supervisionados pelo
+   próprio Docker (`restart: always` no `docker-compose.prod.yml`) — sem
+   Docker, use systemd/supervisor.
+7. **Banco de dados**: `db.sqlite3` é suficiente para o volume de uso do
    Django puro (sessões, contas Google), mas considere Postgres se o
    volume de usuários crescer.
+
+**Verificação extra**: rode `python manage.py check --deploy` com as
+variáveis de produção definidas — ele confere coisas que este checklist não
+cobre (ex.: `SECURE_HSTS_SECONDS`, que habilita HTTP Strict Transport
+Security. **Não ative isso de primeira**: é irreversível pelo navegador do
+usuário até expirar o prazo configurado — só considere depois que HTTPS
+estiver funcionando de forma estável no domínio real).
+
+**Proteção CSRF**: os endpoints que alteram dado (upload, adicionar link,
+editar classificação, excluir arquivo) exigem o cookie/token CSRF padrão do
+Django — já vem funcionando (`core/views.py::_render_page` garante que toda
+página sete o cookie, e o frontend já manda o header `X-CSRFToken` em
+`static/js/catalog-client.js::getCsrfToken()`). Não marque essas views como
+`csrf_exempt` de novo.
 
 ## Solução De Problemas
 

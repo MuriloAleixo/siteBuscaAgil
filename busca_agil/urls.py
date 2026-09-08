@@ -20,7 +20,9 @@ urlpatterns = [
     # /accounts/google/login/callback/ recebe a volta do Google.
     path("accounts/", include("allauth.urls")),
     path("", include("core.urls")),
-    path("css/<path:path>", serve, {"document_root": settings.BASE_DIR / "css"}),
-    path("js/<path:path>", serve, {"document_root": settings.BASE_DIR / "js"}),
+    # CSS/JS reais ficam em static/ e são servidos via STATIC_URL (dev: direto
+    # de STATICFILES_DIRS; produção: WhiteNoise, ver STORAGES em settings.py)
+    # — não por aqui. media/ segue à parte porque é conteúdo dinâmico
+    # (pouso temporário de upload, não coletável por collectstatic).
     path("media/<path:path>", serve, {"document_root": settings.MEDIA_ROOT}),
 ]

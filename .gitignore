@@ -3,6 +3,9 @@ __pycache__/
 *.pyc
 db.sqlite3
 venv/
+# gerado por `collectstatic` (produção, ver docker-compose.prod.yml) —
+# derivado de static/, não é fonte
+staticfiles/
 data/*.lock
 # pouso temporário de upload — o worker apaga assim que confirma o envio
 # pro Drive; nada aqui deveria sobreviver de verdade (ver core/views.py)

@@ -2,6 +2,11 @@
 # install.sh — sobe o BuscaÁgil inteiro (Django, Celery+Redis, IA local via
 # Ollama) do zero, só com Docker instalado. Veja README.md, seção
 # "Rodar Com Docker (Recomendado)".
+#
+# Isso aqui sobe em modo DESENVOLVIMENTO (runserver, DEBUG=true por padrão).
+# Pra produção (Gunicorn, HTTPS, checklist de segurança), veja a seção
+# "Checklist De Produção" do README.md — usa o mesmo docker-compose.yml
+# mais um override (docker-compose.prod.yml), não este script.
 set -euo pipefail
 cd "$(dirname "$0")"
 

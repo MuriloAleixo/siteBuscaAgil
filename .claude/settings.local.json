@@ -214,14 +214,41 @@
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && bash -n install.sh && echo SYNTAX_OK\")",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"cd /home/user/Documentos/siteBuscaAgil && docker compose exec -T web celery -A busca_agil inspect ping --timeout 10 2>&1 | tail -5\")",
       "Bash(wsl.exe -d Ubuntu -- bash -lc \"chmod +x /home/user/Documentos/siteBuscaAgil/install.sh && ls -la /home/user/Documentos/siteBuscaAgil/install.sh\")",
-      "Bash(grep -n \"volumes:\" -A 2 \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\user\\\\Documentos\\\\siteBuscaAgil\\\\docker-compose.yml\")"
+      "Bash(grep -n \"volumes:\" -A 2 \"\\\\\\\\wsl.localhost\\\\Ubuntu\\\\home\\\\user\\\\Documentos\\\\siteBuscaAgil\\\\docker-compose.yml\")",
+      "PowerShell(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && python3 manage.py check 2>&1\")",
+      "PowerShell(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && which pip pip3 python3; pip3 --version 2>&1; docker --version 2>&1; docker compose version 2>&1\")",
+      "PowerShell(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && python3 -m py_compile core/views.py core/tasks.py && echo OK_SYNTAX\")",
+      "Bash(cp \"C:/Users/Murilo/AppData/Local/Temp/claude/--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil/69f8ff0e-8876-4251-ac7b-e6263add6662/scratchpad/check_syntax.py\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/check_syntax_tmp.py\")",
+      "PowerShell(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && python3 check_syntax_tmp.py core/views.py core/tasks.py && rm check_syntax_tmp.py\")",
+      "Bash(grep -v \"SECRET\\\\|KEY\\\\|PASSWORD\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/.env\" 2>&1)",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker compose build web 2>&1 | tail -40\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker compose run --rm --no-deps web python manage.py check 2>&1\")",
+      "Bash(cp \"C:/Users/Murilo/AppData/Local/Temp/claude/--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil/69f8ff0e-8876-4251-ac7b-e6263add6662/scratchpad/test_confidence_flow.py\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/test_confidence_flow_tmp.py\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker compose run --rm --no-deps web python manage.py shell -c \\\\\"exec\\(open\\('test_confidence_flow_tmp.py'\\).read\\(\\)\\)\\\\\" 2>&1\")",
+      "Bash(rm -f \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/test_confidence_flow_tmp.py\")",
+      "Bash(rm -f \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/data/users/test_confidence_flow.json\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/data/users/test_confidence_flow.json.lock\")",
+      "Read(///wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/data/**)",
+      "PowerShell(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && git status --short\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && git diff .claude/settings.local.json\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker run --rm python:3.14-slim pip index versions rapidfuzz 2>&1 | head -5\")",
+      "Bash(grep -n \"replace\\(/\\\\[\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/static/js/catalog-client.js\" | cat -A | head -5)",
+      "Read(///wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/static/js/**)",
+      "Bash(cp \"C:/Users/Murilo/AppData/Local/Temp/claude/--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil/69f8ff0e-8876-4251-ac7b-e6263add6662/scratchpad/fix_regex.py\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/fix_regex_tmp.py\")",
+      "PowerShell(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && python3 fix_regex_tmp.py && rm fix_regex_tmp.py\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"which node nodejs 2>&1\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker run --rm -v \\\\\"$\\(pwd\\)\\\\\":/app -w /app node:22-slim node --check static/js/catalog-client.js && node --check static/js/dashboard.js 2>/dev/null; docker run --rm -v \\\\\"$\\(pwd\\)\\\\\":/app -w /app node:22-slim sh -c 'node --check static/js/catalog-client.js && node --check static/js/dashboard.js && node --check static/js/search.js && node --check static/js/file-view.js && echo ALL_JS_OK'\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker run --rm -v /home/user/Documentos/siteBuscaAgil:/app -w /app node:22-slim sh -c 'node --check static/js/catalog-client.js && node --check static/js/dashboard.js && node --check static/js/search.js && node --check static/js/file-view.js && echo ALL_JS_OK'\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker compose build web 2>&1 | tail -20 && docker compose run --rm --no-deps web python manage.py check 2>&1\")",
+      "Bash(cp \"C:/Users/Murilo/AppData/Local/Temp/claude/--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil/69f8ff0e-8876-4251-ac7b-e6263add6662/scratchpad/test_search_relevance.py\" \"//wsl.localhost/Ubuntu/home/user/Documentos/siteBuscaAgil/test_search_relevance_tmp.py\")",
+      "Bash(wsl -d Ubuntu -- bash -c \"cd /home/user/Documentos/siteBuscaAgil && docker compose run --rm --no-deps web python manage.py shell -c \\\\\"exec\\(open\\('test_search_relevance_tmp.py'\\).read\\(\\)\\)\\\\\" 2>&1\")"
     ],
     "additionalDirectories": [
       "\\\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil\\static",
       "C:\\Users\\Murilo\\AppData\\Local\\Temp\\claude\\--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil\\60cb709f-d137-4248-955e-57749964d49c\\scratchpad\\pw",
       "\\\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil\\scripts",
       "\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil\\scripts",
-      "C:\\Users\\Murilo\\AppData\\Local\\Temp\\claude\\--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil\\43186f6d-8c86-4379-bffd-dd269538bf32\\scratchpad"
+      "C:\\Users\\Murilo\\AppData\\Local\\Temp\\claude\\--wsl-localhost-Ubuntu-home-user-Documentos-siteBuscaAgil\\43186f6d-8c86-4379-bffd-dd269538bf32\\scratchpad",
+      "\\\\wsl.localhost\\Ubuntu\\home\\user\\Documentos\\siteBuscaAgil"
     ]
   }
 }

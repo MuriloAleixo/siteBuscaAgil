@@ -187,10 +187,12 @@ function renderTags(file) {
 // ── Classificação: exibição + fallback manual quando o Gemini não classifica ──
 function renderClassification(file) {
   const warning = document.getElementById('classification-warning');
+  const lowConfidenceWarning = document.getElementById('low-confidence-warning');
   const categoryEl = document.getElementById('classification-category');
   const hasCategory = !!file.category;
 
   warning.classList.toggle('hidden', hasCategory);
+  lowConfidenceWarning.classList.toggle('hidden', !hasCategory || !isLowConfidence(file));
   categoryEl.innerHTML = hasCategory
     ? `<span class="type-pill" style="background:var(--bg-card);color:var(--text-2);border:1px solid var(--border)">${file.category}</span>`
     : `<span class="text-xs" style="color:var(--text-3)">Não classificado</span>`;
@@ -225,7 +227,7 @@ async function saveClassification() {
   try {
     const res = await fetch(`${UPLOADED_FILES_API_URL}/${encodeURIComponent(currentFile.id)}/update`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ category, tags, description }),
     });
     const data = await res.json();
@@ -237,12 +239,19 @@ async function saveClassification() {
     currentFile.category = f.category || null;
     currentFile.tags = f.tags || [];
     currentFile.description = f.description || '';
+    // Reclassificação manual: backend já zerou confidence/scores (ver
+    // core/views.py::update_file_metadata) — refletir aqui pra badge de
+    // baixa confiança sumir sem precisar recarregar a página.
+    currentFile.confidence = null;
+    currentFile.classificationSource = 'manual';
 
     const idx = MOCK_FILES.findIndex((x) => x.id === currentFile.id);
     if (idx !== -1) {
       MOCK_FILES[idx].category = currentFile.category;
       MOCK_FILES[idx].tags = currentFile.tags;
       MOCK_FILES[idx].description = currentFile.description;
+      MOCK_FILES[idx].confidence = currentFile.confidence;
+      MOCK_FILES[idx].classificationSource = currentFile.classificationSource;
     }
 
     renderClassification(currentFile);
@@ -338,6 +347,7 @@ async function doDelete() {
   try {
     const res = await fetch(`${UPLOADED_FILES_API_URL}/${encodeURIComponent(currentFile.id)}/delete`, {
       method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
     });
     const data = await res.json();
     if (!res.ok || !data.success) {

@@ -128,6 +128,7 @@ function renderSearchCard(file, query) {
         <div class="result-name">${titleHtml}</div>
         <div class="result-meta mt-0.5">${typeInfo.label} • ${formatFileSize(file.size)} • Criado em ${formatDate(file.createdAt)}</div>
       </div>
+      ${isLowConfidence(file) ? `<i data-lucide="help-circle" class="w-4 h-4" style="color:#f97316" title="Classificação automática com baixa confiança"></i>` : ''}
       <span class="type-pill hidden sm:inline-flex" style="background:${typeInfo.bg};color:${typeInfo.color}">${typeInfo.label}</span>
       <i data-lucide="arrow-right" class="w-4 h-4" style="color:var(--text-3)"></i>
     </div>

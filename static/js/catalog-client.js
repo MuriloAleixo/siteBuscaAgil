@@ -45,18 +45,103 @@ function getFileById(id) {
   return MOCK_FILES.find((f) => f.id === id) || null;
 }
 
+// Lê o cookie "csrftoken" que o Django seta em toda página (ver
+// core/views.py::_render_page) — precisa ir no header X-CSRFToken de
+// qualquer POST (upload, add-link, editar classificação, excluir), senão o
+// Django recusa com 403 (CsrfViewMiddleware).
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+// =============================================================
+// Critério de busca local (fallback quando a query é vazia ou quando o
+// smart_search do backend falha/está indisponível) — mesma lógica de
+// core/text_match.py (normalizar acento + fuzzy matching), aplicada aos
+// MESMOS campos (nome, descrição, categoria, tags), pra não ter mais dois
+// motores de busca com critério diferente.
+// =============================================================
+
+const SEARCH_FUZZY_THRESHOLD = 80;
+
+function normalizeText(text) {
+  return (text || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function levenshteinDistance(a, b) {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  let prevRow = new Array(b.length + 1);
+  let currRow = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prevRow[j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    currRow[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      currRow[j] = Math.min(prevRow[j] + 1, currRow[j - 1] + 1, prevRow[j - 1] + cost);
+    }
+    [prevRow, currRow] = [currRow, prevRow];
+  }
+  return prevRow[b.length];
+}
+
+function similarityRatio(a, b) {
+  if (!a.length && !b.length) return 100;
+  const dist = levenshteinDistance(a, b);
+  return (1 - dist / Math.max(a.length, b.length)) * 100;
+}
+
+// Aproximação do rapidfuzz.partial_ratio usado no backend: acha a janela de
+// `candidate` do mesmo tamanho de `query` com maior similaridade, em vez de
+// comparar o candidate inteiro (senão uma query curta nunca bateria bem
+// contra um texto longo, tipo uma descrição).
+function fuzzyScore(query, candidate) {
+  const q = normalizeText(query);
+  const c = normalizeText(candidate);
+  if (!q || !c) return 0;
+  if (c.includes(q)) return 100;
+  if (q.length >= c.length) return similarityRatio(q, c);
+
+  let best = 0;
+  for (let i = 0; i <= c.length - q.length; i++) {
+    best = Math.max(best, similarityRatio(q, c.slice(i, i + q.length)));
+    if (best >= 100) break;
+  }
+  return best;
+}
+
+function fileRelevance(file, query) {
+  const category = normalizeText(file.category);
+  const tags = (file.tags || []).map(normalizeText);
+
+  if (category && category === normalizeText(query)) return 100;
+  if (tags.includes(normalizeText(query))) return 98;
+
+  const haystack = [file.name, file.description, file.category, (file.tags || []).join(" ")]
+    .filter(Boolean)
+    .join(" ");
+  return fuzzyScore(query, haystack);
+}
+
 function searchFiles(query, filterType = "all") {
   let results = [...MOCK_FILES];
   if (filterType && filterType !== "all") {
     results = results.filter((f) => f.type === filterType);
   }
-  if (query && query.trim() !== "") {
-    const q = query.toLowerCase();
-    results = results.filter(
-      (f) =>
-        f.name.toLowerCase().includes(q) ||
-        (f.tags && f.tags.some((t) => t.toLowerCase().includes(q)))
-    );
+  const q = (query || "").trim();
+  if (q) {
+    results = results
+      .map((file) => ({ file, score: fileRelevance(file, q) }))
+      .filter(({ score }) => score >= SEARCH_FUZZY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+      .map(({ file }) => file);
   }
   return results;
 }
@@ -72,6 +157,19 @@ const UPLOADED_FILES_API_URL =
 const SMART_SEARCH_API_URL =
   window.BUSCA_AGIL_SEARCH_URL ||
   (window.location.protocol === "file:" ? "http://localhost:8000/search-query" : "/search-query");
+
+// Abaixo disso, uma classificação feita por IA é considerada "duvidosa" e
+// vale sinalizar na UI pra revisão — classificação manual nunca entra aqui
+// (ver classificationSource).
+const LOW_CONFIDENCE_THRESHOLD = 0.55;
+
+function isLowConfidence(file) {
+  return (
+    file.classificationSource === "ai" &&
+    typeof file.confidence === "number" &&
+    file.confidence < LOW_CONFIDENCE_THRESHOLD
+  );
+}
 
 function mapUploadedFileToCard(f) {
   const tags = [...(f.tags || [])];
@@ -90,6 +188,8 @@ function mapUploadedFileToCard(f) {
     category: f.category || null,
     description: f.description || "",
     status: f.status || "done",
+    confidence: typeof f.confidence === "number" ? f.confidence : null,
+    classificationSource: f.classification_source || null,
   };
 }
 

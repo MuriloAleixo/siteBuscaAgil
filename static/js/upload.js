@@ -161,6 +161,7 @@ function uploadFileToMedia(file, onProgress) {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', UPLOAD_API_URL, true);
     xhr.responseType = 'json';
+    xhr.setRequestHeader('X-CSRFToken', getCsrfToken());
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
@@ -284,7 +285,7 @@ async function addLink() {
   try {
     const res = await fetch(ADD_LINK_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ url }),
     });
     const data = await res.json();

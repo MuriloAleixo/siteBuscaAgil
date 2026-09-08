@@ -36,6 +36,16 @@ def _classify_best_effort(origem: str) -> dict | None:
         return None
 
 
+def _confidence_from_resultado(resultado: dict | None) -> float | None:
+    """Score (0.0-1.0) que o classificador deu pra categoria escolhida como
+    principal — usado pro frontend sinalizar classificações duvidosas em vez
+    de descartar o score assim que ele chega."""
+    if not resultado:
+        return None
+    scores = resultado.get("scores") or {}
+    return scores.get(resultado.get("categoria_principal"))
+
+
 def _run_file_upload(user_id: int, saved_path: str, entry_id: str, original_name: str) -> None:
     resultado = _classify_best_effort(saved_path)
 
@@ -65,6 +75,9 @@ def _run_file_upload(user_id: int, saved_path: str, entry_id: str, original_name
         category=(resultado or {}).get("categoria_principal"),
         tags=(resultado or {}).get("tags", []),
         description=(resultado or {}).get("descricao", ""),
+        scores=(resultado or {}).get("scores", {}),
+        confidence=_confidence_from_resultado(resultado),
+        classification_source="ai" if resultado else None,
         url=uploaded["web_view_link"],
         drive_file_id=uploaded["file_id"],
     )
@@ -95,6 +108,9 @@ def _run_link_classification(user_id: int, url: str, entry_id: str) -> None:
         category=resultado.get("categoria_principal"),
         tags=resultado.get("tags", []),
         description=resultado.get("descricao", ""),
+        scores=resultado.get("scores", {}),
+        confidence=_confidence_from_resultado(resultado),
+        classification_source="ai",
     )
 
     User = get_user_model()

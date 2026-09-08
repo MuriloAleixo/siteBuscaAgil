@@ -1,0 +1,23 @@
+# Override de produção — usar JUNTO com o docker-compose.yml (não substitui):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Troca o `command` do "web" de `runserver` (servidor de desenvolvimento)
+# pra Gunicorn, e roda `collectstatic` (WhiteNoise serve os estáticos
+# coletados — ver STATIC_ROOT/STORAGES em busca_agil/settings.py). Antes de
+# usar, confira o "Checklist De Produção" no README.md — em especial
+# DJANGO_DEBUG=false, DJANGO_SECRET_KEY e DJANGO_ALLOWED_HOSTS no .env, sem
+# os quais o Django recusa subir de propósito.
+services:
+  web:
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn busca_agil.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    restart: always
+
+  worker:
+    restart: always
+
+  ollama:
+    restart: always

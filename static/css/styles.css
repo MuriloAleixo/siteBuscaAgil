@@ -506,6 +506,15 @@ input,select,textarea { font-family:inherit; }
   color: #fbbf24;
   filter: drop-shadow(0 0 6px rgba(251,191,36,0.6));
 }
+.low-confidence-badge {
+  position: absolute; top: 10px; left: 10px;
+  width: 24px; height: 24px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: #f97316;
+  color: #1a1207;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.3), 0 0 8px rgba(249,115,22,0.6);
+}
 .files-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));

@@ -109,7 +109,10 @@ página de detalhes. Nela você encontra:
   de lápis pra editar manualmente — útil quando o arquivo não foi
   classificado automaticamente (avisa isso na tela), ou quando você quer
   corrigir/completar categoria, tags (separadas por vírgula) e descrição.
-  Clique em **"Salvar"** pra confirmar.
+  Clique em **"Salvar"** pra confirmar. Quando a IA classificou o arquivo
+  mas ficou pouco confiante do resultado, aparece um selo laranja avisando
+  pra revisar a categoria/tags — some assim que você confirma ou corrige
+  manualmente.
 - **Ações**: **"Abrir no Google Drive"**, **"Baixar Arquivo"** (baixa o
   conteúdo real, não só o link), **"Copiar Link"** (copia o link desta
   página de detalhes), e **"Remover do Drive"**.
@@ -146,6 +149,8 @@ manualmente na página de detalhes.
 **A busca não encontrou um arquivo que eu sei que enviei.** Tente buscar só
 por parte do nome, ou pelo assunto/categoria em vez do nome exato — a busca
 também considera o que a IA entendeu do conteúdo, não só o nome do arquivo.
+Ela tolera erro de digitação e não faz diferença entre buscar com ou sem
+acento (ex.: "relatorio" encontra "relatório").
 
 **Onde meus arquivos ficam guardados de verdade?** No seu próprio Google
 Drive, dentro de uma pasta chamada `buscaagil_upload`. O BuscaÁgil só

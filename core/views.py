@@ -11,13 +11,14 @@ from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.files.storage import FileSystemStorage
 from django.http import HttpResponse, JsonResponse
+from django.middleware.csrf import get_token
 from django.shortcuts import redirect, render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from core import google_drive, uploaded_files_store
 from core.models import DriveProfile
 from core.tasks import classify_and_catalog_task, classify_link_task, sync_catalog_to_drive
+from core.text_match import FUZZY_THRESHOLD, fuzzy_score, normalize
 from scripts.analisador_busca import BuscaAnalyzer
 from scripts.local_ai.busca_analyzer_local import LocalBuscaAnalyzer
 from scripts.local_ai.router import local_ai_habilitada
@@ -54,6 +55,13 @@ def _categorize_file(name: str, content_type: str | None) -> str:
 
 
 def _render_page(request, template_name: str):
+    # Nenhum template usa {% csrf_token %} (não há herança de template —
+    # cada HTML é standalone), então sem isso o cookie "csrftoken" nunca é
+    # setado e o frontend não teria como mandar o header X-CSRFToken nos
+    # endpoints que alteram dado (ver getCsrfToken() em catalog-client.js).
+    # get_token() força o cookie a ser setado nesta resposta, em todas as
+    # páginas de uma vez, sem precisar decorar cada view individualmente.
+    get_token(request)
     return render(request, template_name)
 
 
@@ -140,7 +148,6 @@ def post_login_sync(request):
     return redirect("dashboard")
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def upload_files(request):
@@ -193,6 +200,9 @@ def upload_files(request):
                 "category": None,
                 "tags": [],
                 "description": "",
+                "scores": {},
+                "confidence": None,
+                "classification_source": None,
                 "task_id": task_id,
             },
         )
@@ -212,7 +222,6 @@ def upload_files(request):
     return JsonResponse({"success": True, "files": saved_files})
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def add_link(request):
@@ -258,6 +267,9 @@ def add_link(request):
         "category": None,
         "tags": [],
         "description": "",
+        "scores": {},
+        "confidence": None,
+        "classification_source": None,
         "task_id": task_id,
     }
 
@@ -266,7 +278,6 @@ def add_link(request):
     return JsonResponse({"success": True, "file": entry})
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def update_file_metadata(request, file_id: str):
@@ -286,6 +297,13 @@ def update_file_metadata(request, file_id: str):
     if "category" in payload:
         category = (payload.get("category") or "").strip().lower()
         entry["category"] = category or None
+        # Categoria escolhida à mão pelo usuário: os scores da classificação
+        # automática (se houver) não fazem mais sentido pra essa entry — sem
+        # isso, a badge de "baixa confiança" continuaria aparecendo mesmo
+        # depois do usuário confirmar/corrigir a categoria.
+        entry["scores"] = {}
+        entry["confidence"] = None
+        entry["classification_source"] = "manual"
 
     if "tags" in payload:
         tags = payload.get("tags")
@@ -378,7 +396,6 @@ def download_file(request, file_id: str):
     return response
 
 
-@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def delete_file(request, file_id: str):
@@ -424,28 +441,41 @@ def delete_file(request, file_id: str):
     return JsonResponse({"success": True})
 
 
-def _file_matches(entry: dict, categories: list[str], tags: list[str], query_lower: str) -> bool:
-    file_category = (entry.get("category") or "").lower()
-    file_tags = [t.lower() for t in (entry.get("tags") or [])]
-    name = (entry.get("name") or "").lower()
-    description = (entry.get("description") or "").lower()
+def _file_relevance(entry: dict, categories: list[str], tags: list[str], query: str) -> float:
+    """Score de relevância (0-100) do arquivo pra essa busca; 0 = não bate.
+    Único critério de match usado pelo backend — a mesma lógica (normalizar
+    acento + fuzzy) é portada em static/js/catalog-client.js pro fallback
+    local, pra não ter mais dois motores de busca com critérios diferentes.
+    """
+    norm_categories = [normalize(c) for c in categories]
+    norm_tags = [normalize(t) for t in tags]
 
-    if categories and file_category in categories:
-        return True
-    if tags and any(t in file_tags for t in tags):
-        return True
+    file_category = normalize(entry.get("category"))
+    file_tags = [normalize(t) for t in (entry.get("tags") or [])]
+    name = entry.get("name") or ""
+    description = entry.get("description") or ""
+
+    if norm_categories and file_category in norm_categories:
+        return 100.0
+    if norm_tags and any(t in file_tags for t in norm_tags):
+        return 98.0
+
     # As tags/sinônimos que o Gemini sugeriu (ver analisador_busca.py) também
-    # contam se aparecerem na descrição gerada na classificação — muita busca
-    # não bate com nenhuma tag literal, mas está claramente descrita no
-    # resumo do arquivo (ex.: tag "março" batendo em "fechamento de março").
-    if tags and any(t in description or t in name for t in tags):
-        return True
+    # contam se aparecerem (mesmo com erro de digitação) na descrição/nome —
+    # muita busca não bate com nenhuma tag literal, mas está claramente
+    # descrita no resumo do arquivo (ex.: tag "março" batendo em "fechamento
+    # de marco", sem acento).
+    tag_hint_scores = [fuzzy_score(t, name) for t in norm_tags] + [fuzzy_score(t, description) for t in norm_tags]
 
-    # Fallback: substring simples no nome/descrição/categoria/tags. Garante
-    # que a busca nunca fica pior que a antiga por causa de falha/ausência
-    # da análise via Gemini (sem GEMINI_API_KEY, erro de rede etc.).
-    haystack = " ".join([name, description, file_category, " ".join(file_tags)])
-    return query_lower in haystack
+    # Fallback: fuzzy matching (tolera acento e erro de digitação) no
+    # nome/descrição/categoria/tags, no lugar do antigo substring exato
+    # ("in") — garante que a busca nunca fica pior que a antiga por causa de
+    # falha/ausência da análise via Gemini (sem GEMINI_API_KEY, erro de rede
+    # etc.), e agora perdoa typo/acento nesse caso também.
+    haystack = " ".join(filter(None, [name, description, entry.get("category") or "", " ".join(entry.get("tags") or [])]))
+    fallback_score = fuzzy_score(query, haystack)
+
+    return max([fallback_score, *tag_hint_scores], default=0.0)
 
 
 @login_required
@@ -454,8 +484,8 @@ def smart_search(request):
     """
     Busca assistida por IA: envia o texto do campo de busca para o Gemini,
     que devolve as categorias/tags candidatas mais prováveis, e usa isso
-    para filtrar o catálogo local do usuário por categoria, tags e também
-    pela descrição gerada na classificação (ver _file_matches).
+    para filtrar/ranquear o catálogo local do usuário por categoria, tags e
+    também pela descrição gerada na classificação (ver _file_relevance).
     """
     query = (request.GET.get("q") or "").strip()
     all_files = uploaded_files_store.read_all(request.user.id)
@@ -486,8 +516,11 @@ def smart_search(request):
         categories = [c.strip().lower() for c in analise.categorias if c.strip()]
         tags = [t.strip().lower() for t in analise.tags if t.strip()]
 
-    query_lower = query.lower()
-    matched = [f for f in all_files if _file_matches(f, categories, tags, query_lower)]
+    # Ordena por relevância (categoria/tag exata > tag aproximada na
+    # descrição/nome > fuzzy match geral) em vez de devolver na ordem crua
+    # do catálogo.
+    scored = [(f, _file_relevance(f, categories, tags, query)) for f in all_files]
+    matched = [f for f, score in sorted(scored, key=lambda item: item[1], reverse=True) if score >= FUZZY_THRESHOLD]
 
     response = JsonResponse(
         {"success": True, "query": query, "categories": categories, "tags": tags, "files": matched}

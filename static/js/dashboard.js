@@ -153,11 +153,17 @@ function renderFileGridCard(file, query) {
        </div>`;
 
   const star = file.starred ? `<span class="file-star"><i data-lucide="star" style="width:16px;height:16px;fill:#fbbf24"></i></span>` : '';
+  const confidenceBadge = isLowConfidence(file)
+    ? `<span class="low-confidence-badge" title="Classificação automática com baixa confiança — vale revisar">
+         <i data-lucide="help-circle" style="width:13px;height:13px"></i>
+       </span>`
+    : '';
 
   return `
     <div class="file-grid-card" onclick="openFile('${file.id}')">
       ${preview}
       ${star}
+      ${confidenceBadge}
       <div class="file-grid-body">
         <div class="file-grid-name" title="${file.name}">${titleHtml}</div>
         <div class="flex items-center justify-between mt-2">
@@ -186,6 +192,7 @@ function renderResultCard(file, query) {
         <div class="result-name" title="${file.name}">${titleHtml}</div>
         <div class="result-meta mt-0.5">${typeInfo.label} • ${formatFileSize(file.size)} • ${formatDate(file.createdAt)}</div>
       </div>
+      ${isLowConfidence(file) ? `<i data-lucide="help-circle" class="w-4 h-4" style="color:#f97316" title="Classificação automática com baixa confiança"></i>` : ''}
       <span class="type-pill hidden sm:inline-flex" style="background:${typeInfo.bg};color:${typeInfo.color}">${typeInfo.label}</span>
       <i data-lucide="chevron-right" class="w-4 h-4" style="color:var(--text-3)"></i>
     </div>`;
