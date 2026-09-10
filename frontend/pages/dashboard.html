@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mecanismo de Busca — BuscaÁgil</title>
+  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'], mono: ['Space Grotesk','monospace'] } } } }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="grid-bg google-search-page">
+
+<div class="dashboard-layout google-search-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl flex items-center justify-center pulse" style="background:linear-gradient(135deg,var(--violet),var(--cyan))">
+          <i data-lucide="search" class="w-4 h-4 text-white"></i>
+        </div>
+        <span class="logo-text text-lg text-white">Busca<span class="gradient-text">Ágil</span></span>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Mecanismo de Busca</span>
+      <a href="dashboard.html" class="nav-item active">
+        <i data-lucide="search" class="nav-icon"></i>
+        <span>Buscar Arquivos</span>
+      </a>
+      <a href="upload.html" class="nav-item">
+        <i data-lucide="upload-cloud" class="nav-icon"></i>
+        <span>Enviar Arquivo</span>
+      </a>
+      <a href="processing.html" class="nav-item">
+        <i data-lucide="loader-2" class="nav-icon"></i>
+        <span>Fila de Processamento</span>
+      </a>
+
+      <span class="nav-section-label">Filtrar por Formato</span>
+      <a href="#" class="nav-item" onclick="filterByType('image')">
+        <i data-lucide="image" class="nav-icon" style="color:var(--cyan)"></i>
+        <span>Imagens</span>
+      </a>
+      <a href="#" class="nav-item" onclick="filterByType('pdf')">
+        <i data-lucide="file-text" class="nav-icon" style="color:#f97316"></i>
+        <span>PDFs</span>
+      </a>
+      <a href="#" class="nav-item" onclick="filterByType('video')">
+        <i data-lucide="play-circle" class="nav-icon" style="color:#a855f7"></i>
+        <span>Vídeos</span>
+      </a>
+      <a href="#" class="nav-item" onclick="filterByType('doc')">
+        <i data-lucide="file" class="nav-icon" style="color:#3b82f6"></i>
+        <span>Documentos</span>
+      </a>
+      <a href="#" class="nav-item" onclick="filterByType('sheet')">
+        <i data-lucide="table" class="nav-icon" style="color:#22c55e"></i>
+        <span>Planilhas</span>
+      </a>
+      <a href="#" class="nav-item" onclick="filterByType('link')">
+        <i data-lucide="link" class="nav-icon" style="color:#eab308"></i>
+        <span>Links</span>
+      </a>
+
+      <span class="nav-section-label">Sua Conta</span>
+      <a href="profile.html" class="nav-item">
+        <i data-lucide="user-circle" class="nav-icon"></i>
+        <span>Perfil / Drive</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="flex items-center gap-3 p-3 rounded-xl" style="background:var(--bg-card);border:1px solid var(--border)">
+        <img id="sidebar-avatar" src="" alt="Avatar" class="avatar avatar-sm" />
+        <div class="flex-1 min-w-0">
+          <p id="sidebar-name" class="text-xs font-bold text-white truncate" style="font-family:'Space Grotesk',sans-serif"></p>
+          <p class="text-xs truncate text-cyan-400">Drive Conectado ✓</p>
+        </div>
+        <button onclick="logout()" class="btn btn-ghost btn-icon" title="Sair" style="padding:4px;color:var(--text-3)">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="mt-3 px-1">
+        <div class="flex justify-between text-xs mb-1" style="color:var(--text-3)">
+          <span>Armazenamento</span>
+          <span id="storage-label"></span>
+        </div>
+        <div class="storage-bar-wrap">
+          <div class="storage-bar" id="storage-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ── MAIN CONTENT ── -->
+  <div class="main-content">
+
+    <!-- Header -->
+    <header class="top-header google-search-header">
+      <button class="btn btn-ghost btn-icon lg:hidden" id="sidebar-toggle">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+      <a href="dashboard.html" class="google-search-logo">
+        <span class="google-search-logo__mark"><i data-lucide="search" class="w-4 h-4"></i></span>
+        <span class="logo-text">Busca<span class="gradient-text">Ágil</span></span>
+      </a>
+      <div class="flex items-center gap-2 ml-auto">
+        <a href="upload.html" class="google-search-upload" title="Enviar arquivo">
+          <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Enviar</span>
+        </a>
+        <a href="processing.html" class="google-search-upload" title="Fila de processamento">
+          <i data-lucide="loader-2" class="w-4 h-4"></i><span class="hidden sm:inline">Fila</span>
+        </a>
+        <a href="profile.html">
+          <img id="header-avatar" src="" alt="Avatar" class="avatar avatar-sm hover:ring-2" style="--tw-ring-color:var(--violet)" />
+        </a>
+      </div>
+    </header>
+
+    <!-- Page Body -->
+    <main class="page-content google-search-content fade-up">
+
+      <!-- Header Intro -->
+      <section class="google-search-hero">
+        <div>
+          <p class="google-search-eyebrow">SEU ÍNDICE PESSOAL</p>
+          <h1>Encontre. <span>Sem procurar.</span></h1>
+          <p class="google-search-description">Busque em todos os arquivos do seu Drive a partir de um único lugar.</p>
+        </div>
+        <div class="google-main-search">
+          <i data-lucide="search" class="w-5 h-5"></i>
+          <input type="search" id="main-search-input" placeholder="Pesquise por nome, assunto ou extensão" autocomplete="off" autofocus />
+          <span class="google-main-search__shortcut">⌘ K</span>
+        </div>
+      </section>
+
+      <div class="google-results-toolbar flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div class="google-results-label">Refine sua busca</div>
+        <div class="flex items-center gap-3">
+          <div class="flex border rounded-lg overflow-hidden" style="border-color:var(--border)">
+            <button class="btn btn-ghost btn-icon rounded-none" id="view-grid-btn" onclick="setView('grid')" title="Modo Grade">
+              <i data-lucide="grid-3x3" class="w-4 h-4"></i>
+            </button>
+            <button class="btn btn-ghost btn-icon rounded-none" id="view-list-btn" onclick="setView('list')" title="Modo Lista">
+              <i data-lucide="list" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <select class="sort-select" id="sort-select" onchange="renderFiles()">
+            <option value="date-desc">Mais recentes</option>
+            <option value="date-asc">Mais antigos</option>
+            <option value="name-asc">Nome (A–Z)</option>
+            <option value="size-desc">Maior tamanho</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Filter Chips Bar -->
+      <div class="flex gap-2 mb-6 overflow-x-auto pb-1" id="filter-chips-row">
+        <button class="filter-chip active" data-type="all" onclick="setTypeFilter('all')">Todos</button>
+        <button class="filter-chip" data-type="image" onclick="setTypeFilter('image')">
+          <i data-lucide="image" class="w-3.5 h-3.5 text-cyan-400"></i> Imagens
+        </button>
+        <button class="filter-chip" data-type="pdf" onclick="setTypeFilter('pdf')">
+          <i data-lucide="file-text" class="w-3.5 h-3.5 text-orange-400"></i> PDFs
+        </button>
+        <button class="filter-chip" data-type="video" onclick="setTypeFilter('video')">
+          <i data-lucide="play-circle" class="w-3.5 h-3.5 text-purple-400"></i> Vídeos
+        </button>
+        <button class="filter-chip" data-type="doc" onclick="setTypeFilter('doc')">
+          <i data-lucide="file" class="w-3.5 h-3.5 text-blue-400"></i> Documentos
+        </button>
+        <button class="filter-chip" data-type="sheet" onclick="setTypeFilter('sheet')">
+          <i data-lucide="table" class="w-3.5 h-3.5 text-green-400"></i> Planilhas
+        </button>
+        <button class="filter-chip" data-type="link" onclick="setTypeFilter('link')">
+          <i data-lucide="link" class="w-3.5 h-3.5 text-yellow-400"></i> Links
+        </button>
+      </div>
+
+      <!-- Search Result Stats Bar -->
+      <div class="flex items-center justify-between text-xs mb-4" style="color:var(--text-3);font-family:'Space Grotesk',sans-serif">
+        <span id="search-status-text">Exibindo todos os arquivos</span>
+        <span id="search-count-badge" class="font-mono text-purple-300"></span>
+      </div>
+
+      <!-- Files Container (Grid or List) -->
+      <div id="files-container"></div>
+
+      <!-- Empty Search State -->
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-icon">
+          <i data-lucide="search-x" class="w-10 h-10"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Nenhum arquivo encontrado</h3>
+        <p id="empty-message-text" style="color:var(--text-2);font-size:14px"></p>
+        <button class="btn btn-outline btn-sm mt-2" onclick="clearSearchAndFilters()">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i> Limpar filtros e busca
+        </button>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Mobile Bottom Nav -->
+<nav class="mobile-nav">
+  <div class="mobile-nav-items">
+    <a href="dashboard.html" class="mobile-nav-item active">
+      <i data-lucide="search"></i><span>Buscar</span>
+    </a>
+    <a href="upload.html" class="mobile-nav-item">
+      <i data-lucide="upload-cloud"></i><span>Enviar</span>
+    </a>
+    <a href="processing.html" class="mobile-nav-item">
+      <i data-lucide="loader-2"></i><span>Fila</span>
+    </a>
+    <a href="profile.html" class="mobile-nav-item">
+      <i data-lucide="user-circle"></i><span>Perfil</span>
+    </a>
+  </div>
+</nav>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>(function(){var x=new XMLHttpRequest();x.open("GET","/me",false);try{x.send(null);window.__BUSCA_AGIL_USER__=x.status===200?JSON.parse(x.responseText):null;}catch(e){window.__BUSCA_AGIL_USER__=null;}})();</script>
+<script src="/static/js/catalog-client.js"></script>
+<script src="/static/js/file-utils.js"></script>
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/task-notifications.js"></script>
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>

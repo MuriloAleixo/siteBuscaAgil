@@ -29,7 +29,11 @@ from scripts.local_ai.categorizer_local import _classificar_texto, _legendar_ima
 
 logger = logging.getLogger(__name__)
 
-WHISPER_MODEL_SIZE = os.environ.get("LOCAL_AI_WHISPER_MODEL", "tiny")
+# "small": bem mais preciso que "tiny" (padrão anterior) pra transcrever
+# português, ainda roda em CPU (mais lento que tiny, mas a transcrição já
+# acontece em background no worker). Troque pra "tiny" no .env se a máquina
+# não aguentar, ou "medium"/"large-v3" se tiver GPU/CPU sobrando.
+WHISPER_MODEL_SIZE = os.environ.get("LOCAL_AI_WHISPER_MODEL", "small")
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".wmv"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".m4a"}
@@ -84,7 +88,7 @@ def _transcrever_audio(caminho: str) -> str:
     return " ".join(s.text.strip() for s in segmentos).strip()
 
 
-def classificar_video_ou_audio(caminho: str, candidate_labels: List[str]) -> ClassificacaoArquivo:
+def classificar_video_ou_audio(caminho: str, categorias_conhecidas: List[str]) -> ClassificacaoArquivo:
     ext = Path(caminho).suffix.lower()
 
     try:
@@ -115,4 +119,4 @@ def classificar_video_ou_audio(caminho: str, candidate_labels: List[str]) -> Cla
     if not texto.strip():
         raise ValueError(f"Não foi possível extrair conteúdo de '{caminho}' (sem áudio nem frames)")
 
-    return _classificar_texto(texto, candidate_labels)
+    return _classificar_texto(texto, categorias_conhecidas)

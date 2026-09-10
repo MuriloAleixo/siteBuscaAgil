@@ -12,22 +12,35 @@ services:
       retries: 10
     restart: unless-stopped
 
-  web:
-    build: .
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
-    environment:
-      OLLAMA_BASE_URL: http://ollama:11434
-      CELERY_BROKER_URL: redis://worker:6379/0
-      CELERY_RESULT_BACKEND: redis://worker:6379/0
-    depends_on:
-      - ollama
-      - worker
+  # Broker de mensagens: fila que desacopla "o arquivo chegou" (api) de "o
+  # arquivo foi classificado e subiu pro Drive" (worker). Container próprio
+  # — mais fácil de explicar "broker separado do consumidor", que é o
+  # próprio conceito de sistema distribuído que este projeto quer mostrar.
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
 
+  # API HTTP (Flask): login com Google, upload, busca, status da fila —
+  # nenhum HTML é renderizado aqui, só JSON (ver api/app.py).
+  api:
+    build: .
+    command: flask --app api.app run --host=0.0.0.0 --port=5000 --debug
+    volumes:
+      - .:/app
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      OAUTHLIB_INSECURE_TRANSPORT: "1" # só p/ dev local em http:// — nunca em produção
+    env_file:
+      - .env
+    depends_on:
+      - ollama
+      - redis
+    restart: unless-stopped
+
+  # Worker Celery: consome a fila no Redis, classifica (IA local/Gemini) e
+  # sobe o resultado pro Google Drive do usuário (ver worker/tasks.py).
   worker:
     build: .
     entrypoint: ["sh", "/app/worker/entrypoint.sh"]
@@ -35,8 +48,25 @@ services:
       - .:/app
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    env_file:
+      - .env
     depends_on:
       - ollama
+      - redis
+    restart: unless-stopped
+
+  # Front estático (HTML/CSS/JS solto, sem build step) + reverse proxy das
+  # rotas de dados pro serviço "api" (ver frontend/nginx.conf).
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:

@@ -8,9 +8,9 @@ if (!requireAuth()) throw new Error('Not authenticated');
 const user = getCurrentUser();
 document.getElementById('sidebar-avatar').src = user.avatar;
 document.getElementById('sidebar-name').textContent = user.name;
-const UPLOAD_API_URL = window.BUSCA_AGIL_UPLOAD_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/upload' : '/upload');
-const ADD_LINK_API_URL = window.BUSCA_AGIL_ADD_LINK_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/add-link' : '/add-link');
-const FILE_STATUS_API_URL = window.BUSCA_AGIL_FILE_STATUS_URL || (window.location.protocol === 'file:' ? 'http://localhost:8000/files' : '/files');
+const UPLOAD_API_URL = window.BUSCA_AGIL_UPLOAD_URL || (window.location.protocol === 'file:' ? 'http://localhost/upload' : '/upload');
+const ADD_LINK_API_URL = window.BUSCA_AGIL_ADD_LINK_URL || (window.location.protocol === 'file:' ? 'http://localhost/add-link' : '/add-link');
+const FILE_STATUS_API_URL = window.BUSCA_AGIL_FILE_STATUS_URL || (window.location.protocol === 'file:' ? 'http://localhost/files' : '/files');
 
 // Faz polling em GET /files/<id>/status até a classificação assíncrona
 // (worker Celery, via fila Redis) terminar. Best-effort: se não terminar

@@ -107,6 +107,27 @@ function renderProcessingQueue() {
   lucide.createIcons();
 }
 
+// Conta o que o próprio catálogo do usuário mostra (processing/done/error)
+// e, separadamente, quantas mensagens estão esperando no broker (Redis)
+// pra algum worker Celery consumir — dois ângulos do mesmo conceito de
+// "fila de processamento" (ver GET /queue em api/app.py::queue_status).
+async function refreshQueueStats() {
+  try {
+    const res = await fetch('/queue', { cache: 'no-store' });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success) return;
+
+    document.getElementById('queue-stat-processing').textContent = `${data.counts.processing || 0} processando`;
+    document.getElementById('queue-stat-done').textContent = `${data.counts.done || 0} concluídos`;
+    document.getElementById('queue-stat-error').textContent = `${data.counts.error || 0} com erro`;
+    document.getElementById('queue-stat-broker').textContent =
+      data.pending_in_broker === null ? 'broker indisponível' : `${data.pending_in_broker} no broker`;
+  } catch (e) {
+    // rede instável — mantém os últimos valores exibidos
+  }
+}
+
 async function refreshAndRender() {
   const wasProcessing = new Map(
     MOCK_FILES.filter((f) => f.status === 'processing').map((f) => [f.id, f])
@@ -135,6 +156,7 @@ async function refreshAndRender() {
 }
 
 (async function initProcessing() {
-  await refreshAndRender();
+  await Promise.all([refreshAndRender(), refreshQueueStats()]);
   setInterval(refreshAndRender, PROCESSING_POLL_INTERVAL_MS);
+  setInterval(refreshQueueStats, PROCESSING_POLL_INTERVAL_MS);
 })();

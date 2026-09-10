@@ -1,12 +1,12 @@
 // =============================================================
-// AUTH — login real com Google (django-allauth), sem sessionStorage.
+// AUTH — login real com Google (api/auth.py, sem allauth), sem
+// sessionStorage.
 //
-// window.__BUSCA_AGIL_USER__ é injetado inline em cada template (server-
-// side, via core/context_processors.busca_agil_user) a partir de
-// request.user. Se o usuário não estiver logado, o Django já bloqueia a
-// página com @login_required antes mesmo desse script rodar — as funções
-// abaixo existem pra o front-end (JS que roda no navegador) continuar
-// funcionando do mesmo jeito que antes.
+// window.__BUSCA_AGIL_USER__ é populado por uma chamada síncrona a GET /me
+// (bootstrap inline no topo de cada página, ver frontend/pages/*.html) —
+// antes disso era injetado pelo servidor (Django); agora a própria página
+// estática busca o usuário logado assim que carrega, antes de qualquer
+// outro script rodar.
 // =============================================================
 
 function isLoggedIn() {
@@ -24,16 +24,17 @@ function getCurrentUser() {
 }
 
 function loginWithGoogle() {
-  window.location.href = "/accounts/google/login/?process=login";
+  window.location.href = "/auth/login";
 }
 
 function logout() {
-  window.location.href = "/accounts/logout/";
+  window.location.href = "/auth/logout";
 }
 
-// Guard client-side (best-effort — a proteção real é @login_required no
-// Django). Mantido pelo mesmo motivo de sempre: evitar telas quebradas se
-// o usuário abrir a página com JS desatualizado em cache.
+// Guard client-side (proteção real é @login_required nas rotas de
+// api/app.py, que devolvem 401 sem sessão válida). Mantido pelo mesmo
+// motivo de sempre: evitar telas quebradas se o usuário abrir a página com
+// JS desatualizado em cache.
 function requireAuth() {
   if (!isLoggedIn()) {
     window.location.href = "index.html";

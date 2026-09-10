@@ -27,7 +27,11 @@ from scripts.local_ai.ollama_client import gerar_com_imagem, gerar_texto
 
 logger = logging.getLogger(__name__)
 
-TEXT_MODEL = os.environ.get("LOCAL_AI_TEXT_MODEL", "qwen2.5:3b-instruct")
+# qwen2.5:7b-instruct: mais preciso que o 3b pra seguir o schema JSON e
+# extrair categoria/tags/descrição corretas — mais lento em CPU, mas ainda
+# viável (a classificação já roda em background, no worker). Troque pra
+# "qwen2.5:3b-instruct" no .env se a máquina não aguentar o 7b.
+TEXT_MODEL = os.environ.get("LOCAL_AI_TEXT_MODEL", "qwen2.5:7b-instruct")
 VISION_MODEL = os.environ.get("LOCAL_AI_VISION_MODEL", "moondream")
 
 # Abaixo disso, um PDF é tratado como "sem texto nativo" (provavelmente
@@ -36,32 +40,44 @@ PDF_MIN_CHARS_TEXTO_NATIVO = 200
 PDF_MAX_PAGINAS_IMAGEM = 3
 
 
-def _montar_instrucao_classificacao(texto: str, candidate_labels: List[str]) -> str:
+def _montar_instrucao_classificacao(texto: str, categorias_conhecidas: List[str]) -> str:
     schema_exemplo = {
-        "categoria_principal": "<uma das categorias candidatas>",
+        "categoria_principal": "<categoria que melhor descreve o conteúdo>",
+        "confianca": 0.0,
         "tags": ["3 a 6 palavras-chave específicas do conteúdo"],
         "descricao": "resumo objetivo em 1 a 2 frases",
-        "scores": [{"categoria": "<categoria>", "score": 0.0} for _ in range(1)],
     }
+    categorias_hint = (
+        f"Categorias já usadas no catálogo deste usuário (reaproveite uma se fizer sentido, "
+        f"copiando exatamente; NÃO é uma lista fechada, crie uma nova se nenhuma servir): "
+        f"{', '.join(categorias_conhecidas)}"
+        if categorias_conhecidas
+        else "Nenhuma categoria foi usada ainda por este usuário — crie a primeira, curta e "
+        "genérica o suficiente pra se repetir depois (ex.: 'financeiro', 'contrato', 'nota "
+        "fiscal' são exemplos de estilo, não uma lista obrigatória)."
+    )
     return (
         "Leia com atenção TODO o conteúdo a seguir antes de responder — a precisão da "
         "classificação importa mais do que a velocidade. Baseie-se apenas no que está "
         "escrito no conteúdo, nunca no nome do arquivo isoladamente.\n\n"
-        "Responda APENAS com um JSON válido, exatamente neste formato "
-        f"(um item de 'scores' para CADA categoria candidata): {json.dumps(schema_exemplo, ensure_ascii=False)}\n\n"
-        "Em 'categoria_principal', informe a categoria de maior score dentre as candidatas. "
-        "Se nenhuma categoria tiver relação clara com o conteúdo, use 'outros'.\n\n"
-        "Em 'tags', NÃO repita os nomes das categorias candidatas — extraia de 3 a 6 "
-        "palavras-chave ou termos específicos que aparecem no próprio conteúdo (nomes de "
-        "pessoas/empresas, produtos, datas, números de documento, termos técnicos "
-        "relevantes), em minúsculas.\n\n"
-        f"Categorias candidatas: {', '.join(candidate_labels)}\n\n"
+        "Responda APENAS com um JSON válido, exatamente neste formato: "
+        f"{json.dumps(schema_exemplo, ensure_ascii=False)}\n\n"
+        f"{categorias_hint}\n\n"
+        "Em 'confianca' (0.0 a 1.0), seja rigoroso: o quanto o conteúdo REALMENTE pertence à "
+        "categoria escolhida, não infle por semelhança superficial.\n\n"
+        "Em 'tags', NÃO repita a categoria escolhida nem use termos genéricos como "
+        "'documento'/'arquivo'/'informação' — extraia de 3 a 6 palavras-chave ou termos "
+        "específicos que aparecem no próprio conteúdo (nomes de pessoas/empresas, produtos, "
+        "datas, números de documento, termos técnicos relevantes), em minúsculas, pensando em "
+        "o que alguém digitaria pra achar justo ESTE arquivo.\n\n"
+        "Em 'descricao', cite fatos concretos (quem, o quê, quando, valores) em vez de frases "
+        "genéricas.\n\n"
         f"Conteúdo:\n{texto[:12000]}"
     )
 
 
-def _classificar_texto(texto: str, candidate_labels: List[str]) -> ClassificacaoArquivo:
-    prompt = _montar_instrucao_classificacao(texto, candidate_labels)
+def _classificar_texto(texto: str, categorias_conhecidas: List[str]) -> ClassificacaoArquivo:
+    prompt = _montar_instrucao_classificacao(texto, categorias_conhecidas)
 
     bruto = gerar_texto(TEXT_MODEL, prompt)
     try:
@@ -108,9 +124,9 @@ def _legendar_pdf_escaneado(caminho: str) -> str:
 class LocalCategorizer:
     """Equivalente local de GeminiCategorizer — mesma interface pública."""
 
-    def classificar(self, conteudo: dict, candidate_labels: List[str]) -> ClassificacaoArquivo:
+    def classificar(self, conteudo: dict, categorias_conhecidas: List[str]) -> ClassificacaoArquivo:
         if conteudo["tipo"] == "texto":
-            return _classificar_texto(conteudo["conteudo"], candidate_labels)
+            return _classificar_texto(conteudo["conteudo"], categorias_conhecidas)
 
         if conteudo["tipo"] == "arquivo":
             mime_type = conteudo.get("mime_type") or ""
@@ -118,13 +134,13 @@ class LocalCategorizer:
 
             if mime_type.startswith("image/"):
                 legenda = _legendar_imagem(caminho)
-                return _classificar_texto(legenda, candidate_labels)
+                return _classificar_texto(legenda, categorias_conhecidas)
 
             if mime_type == "application/pdf":
                 texto = _texto_nativo_pdf(caminho)
                 if len(texto.strip()) < PDF_MIN_CHARS_TEXTO_NATIVO:
                     texto = _legendar_pdf_escaneado(caminho)
-                return _classificar_texto(texto, candidate_labels)
+                return _classificar_texto(texto, categorias_conhecidas)
 
             raise ValueError(f"IA local não sabe tratar mime_type: {mime_type}")
 

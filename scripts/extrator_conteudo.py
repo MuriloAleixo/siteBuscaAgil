@@ -1,18 +1,25 @@
 """
 extrator_conteudo.py
 
-Prepara o conteúdo de um arquivo (ou link) para ser enviado ao Gemini.
+Prepara o conteúdo de um arquivo (ou link) para ser enviado ao classificador
+(Gemini ou IA local).
 
 Duas saídas possíveis:
   - {"tipo": "texto", "conteudo": "..."}          -> vai como texto no prompt
   - {"tipo": "arquivo", "caminho": "...", "mime_type": "..."} -> vai como
     parte binária nativa (imagem/PDF), o Gemini processa diretamente
 
-Formatos cobertos: txt, py, csv, xlsx, xls, doc, docx, jpg, jpeg, png, pdf, e links (http/https).
+Formatos cobertos: txt, py, csv, xlsx, xls, doc, docx, jpg, jpeg, png, pdf,
+e links (http/https) — com tratamento especial pra YouTube (título +
+transcrição/legenda do vídeo, não só o HTML da página) e priorização de
+título/meta-descrição pra qualquer outro link (ver `_extrair_link`).
 """
 
+import logging
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
+
+logger = logging.getLogger(__name__)
 
 
 MIME_TYPES_NATIVOS = {
@@ -22,9 +29,15 @@ MIME_TYPES_NATIVOS = {
     ".png": "image/png",
 }
 
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
+
 
 def eh_link(origem: str) -> bool:
     return urlparse(origem).scheme in ("http", "https")
+
+
+def _eh_youtube(url: str) -> bool:
+    return urlparse(url).netloc.lower() in YOUTUBE_HOSTS
 
 
 def _extrair_txt(caminho: str) -> str:
@@ -32,8 +45,8 @@ def _extrair_txt(caminho: str) -> str:
 
 
 def _extrair_csv(caminho: str) -> str:
-    # manda o CSV cru como texto — o Gemini entende bem tabela em texto puro,
-    # não precisa parsear em DataFrame só pra classificar o conteúdo
+    # manda o CSV cru como texto — o classificador entende bem tabela em
+    # texto puro, não precisa parsear em DataFrame só pra classificar
     return Path(caminho).read_text(encoding="utf-8", errors="ignore")
 
 
@@ -88,7 +101,13 @@ def _extrair_doc(caminho: str) -> str:
 
 
 def _extrair_link(url: str) -> str:
-    """Requer: pip install requests beautifulsoup4 --break-system-packages"""
+    """Requer: pip install requests beautifulsoup4 --break-system-packages
+
+    Título e meta-descrição vêm PRIMEIRO no texto retornado, de propósito:
+    o classificador trunca o conteúdo em 12000 caracteres (ver
+    categorizer_gemini.py/categorizer_local.py) — numa página longa, sem
+    isso o sinal mais confiável (o que a própria página diz que é) podia
+    nem chegar a ser lido."""
     import requests
     from bs4 import BeautifulSoup
 
@@ -96,21 +115,96 @@ def _extrair_link(url: str) -> str:
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
 
+    partes_prioritarias = []
+    if soup.title and soup.title.string and soup.title.string.strip():
+        partes_prioritarias.append(f"Título da página: {soup.title.string.strip()}")
+    meta_desc = soup.find("meta", attrs={"name": "description"}) or soup.find(
+        "meta", attrs={"property": "og:description"}
+    )
+    if meta_desc and meta_desc.get("content"):
+        partes_prioritarias.append(f"Descrição da página: {meta_desc['content'].strip()}")
+
     for tag in soup(["script", "style", "nav", "footer", "header"]):
         tag.decompose()
 
     texto = soup.get_text(separator="\n")
     linhas = [l.strip() for l in texto.splitlines() if l.strip()]
-    return "\n".join(linhas)
+    corpo = "\n".join(linhas)
+
+    return "\n\n".join(partes_prioritarias + [corpo]) if partes_prioritarias else corpo
+
+
+def _extrair_video_id_youtube(url: str) -> str | None:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+
+    if "youtu.be" in host:
+        video_id = parsed.path.strip("/")
+        return video_id or None
+
+    if "youtube.com" in host:
+        query = parse_qs(parsed.query)
+        if "v" in query:
+            return query["v"][0]
+        partes = [p for p in parsed.path.split("/") if p]
+        if len(partes) >= 2 and partes[0] in ("shorts", "embed", "live"):
+            return partes[1]
+
+    return None
+
+
+def _extrair_youtube(url: str) -> str:
+    """Título/canal via oEmbed (endpoint público do YouTube, sem precisar de
+    API key) + transcrição/legenda do vídeo (se existir) — dá pra
+    classificar pelo CONTEÚDO real falado no vídeo, não só pelo título.
+    O HTML puro da página do YouTube não serve pra nada aqui: é uma SPA
+    renderizada via JS, praticamente sem texto útil no `requests.get` cru.
+    """
+    import requests
+
+    partes = []
+    try:
+        resp = requests.get(
+            "https://www.youtube.com/oembed",
+            params={"url": url, "format": "json"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        info = resp.json()
+        if info.get("title"):
+            partes.append(f"Título do vídeo: {info['title']}")
+        if info.get("author_name"):
+            partes.append(f"Canal: {info['author_name']}")
+    except requests.RequestException as exc:
+        logger.warning("Não foi possível buscar metadados oEmbed do YouTube para '%s': %s", url, exc)
+
+    video_id = _extrair_video_id_youtube(url)
+    if video_id:
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+
+            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=["pt", "pt-BR", "en"])
+            texto_legendas = " ".join(item["text"] for item in transcript).strip()
+            if texto_legendas:
+                partes.append(f"Transcrição/legenda do vídeo:\n{texto_legendas}")
+        except Exception as exc:  # noqa: BLE001 - nem todo vídeo tem legenda; melhor sem do que quebrar
+            logger.warning("Não foi possível obter a transcrição do YouTube '%s': %s", video_id, exc)
+
+    if not partes:
+        # Sem oEmbed nem legenda (vídeo privado/removido/região bloqueada) —
+        # cai pro scraping genérico como último recurso.
+        return _extrair_link(url)
+
+    return "\n\n".join(partes)
 
 
 def preparar_conteudo(origem: str) -> dict:
     """
     origem: caminho de arquivo local OU uma URL.
-    Retorna um dict pronto pra passar ao classificador Gemini.
+    Retorna um dict pronto pra passar ao classificador.
     """
     if eh_link(origem):
-        texto = _extrair_link(origem)
+        texto = _extrair_youtube(origem) if _eh_youtube(origem) else _extrair_link(origem)
         return {"tipo": "texto", "conteudo": texto, "nome_display": origem}
 
     caminho = Path(origem)

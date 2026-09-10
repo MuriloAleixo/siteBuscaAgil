@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualização do Arquivo — BuscaÁgil</title>
+  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'], mono: ['Space Grotesk','monospace'] } } } }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="grid-bg">
+
+<div class="dashboard-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl flex items-center justify-center pulse" style="background:linear-gradient(135deg,var(--violet),var(--cyan))">
+          <i data-lucide="search" class="w-4 h-4 text-white"></i>
+        </div>
+        <span class="logo-text text-lg text-white">Busca<span class="gradient-text">Ágil</span></span>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Mecanismo de Busca</span>
+      <a href="dashboard.html" class="nav-item">
+        <i data-lucide="search" class="nav-icon"></i>
+        <span>Buscar Arquivos</span>
+      </a>
+      <a href="upload.html" class="nav-item">
+        <i data-lucide="upload-cloud" class="nav-icon"></i>
+        <span>Enviar Arquivo</span>
+      </a>
+      <span class="nav-section-label">Sua Conta</span>
+      <a href="profile.html" class="nav-item">
+        <i data-lucide="user-circle" class="nav-icon"></i>
+        <span>Perfil / Drive</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="flex items-center gap-3 p-3 rounded-xl" style="background:var(--bg-card);border:1px solid var(--border)">
+        <img id="sidebar-avatar" src="" alt="Avatar" class="avatar avatar-sm" />
+        <div class="flex-1 min-w-0">
+          <p id="sidebar-name" class="text-xs font-bold text-white truncate" style="font-family:'Space Grotesk',sans-serif"></p>
+          <p class="text-xs truncate text-cyan-400">Drive Conectado ✓</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ── MAIN CONTENT ── -->
+  <div class="main-content">
+    <header class="top-header">
+      <button class="btn btn-ghost btn-icon lg:hidden" id="sidebar-toggle">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+      <button onclick="history.back()" class="btn btn-ghost btn-sm" style="color:var(--text-2)">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        <span>Voltar aos resultados</span>
+      </button>
+      <div class="flex-1"></div>
+      <a href="profile.html">
+        <img id="header-avatar" src="" alt="Avatar" class="avatar avatar-sm" />
+      </a>
+    </header>
+
+    <main class="page-content fade-up">
+
+      <!-- Skeleton Loading -->
+      <div id="skeleton-view" class="max-w-4xl mx-auto">
+        <div class="skeleton h-8 w-2/3 mb-3 rounded-xl"></div>
+        <div class="skeleton h-4 w-1/3 mb-8 rounded-lg"></div>
+        <div class="skeleton h-80 rounded-2xl mb-6"></div>
+      </div>
+
+      <!-- Not Found -->
+      <div id="not-found" class="hidden empty-state">
+        <div class="empty-icon">
+          <i data-lucide="file-x" class="w-10 h-10"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Arquivo não encontrado</h3>
+        <p style="color:var(--text-2);font-size:14px">Este arquivo não existe ou foi removido do Google Drive.</p>
+        <a href="dashboard.html" class="btn btn-violet mt-4">
+          <i data-lucide="search" class="w-4 h-4"></i> Voltar para a Busca
+        </a>
+      </div>
+
+      <!-- File View Main -->
+      <div id="file-view" class="hidden max-w-4xl mx-auto">
+
+        <!-- Title Row -->
+        <div class="flex items-start justify-between gap-4 mb-6">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-3 mb-2">
+              <div id="file-type-badge"></div>
+              <button id="star-btn" onclick="toggleStar()" class="btn btn-ghost btn-icon" style="padding:6px">
+                <i data-lucide="star" id="star-icon" style="width:18px;height:18px"></i>
+              </button>
+            </div>
+            <h1 id="file-name" class="text-2xl sm:text-3xl font-extrabold text-white truncate" style="font-family:'Space Grotesk',sans-serif"></h1>
+          </div>
+          <div class="flex-shrink-0 flex items-center gap-2">
+            <button onclick="openInDrive()" class="btn btn-violet btn-sm sm:btn-md">
+              <i data-lucide="external-link" class="w-4 h-4"></i>
+              <span>Abrir no Drive</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- File Preview Container -->
+        <div class="file-view-preview mb-6" id="preview-area"></div>
+
+        <!-- Metadata & Details -->
+        <div class="grid lg:grid-cols-3 gap-6">
+
+          <!-- Left Info Box -->
+          <div class="lg:col-span-2 flex flex-col gap-6">
+            <div id="description-box" class="hidden glass-2 rounded-2xl p-6 border" style="border-color:var(--border-2)">
+              <h2 class="text-base font-bold text-white mb-3" style="font-family:'Space Grotesk',sans-serif">Descrição</h2>
+              <p id="description-text" class="text-sm" style="color:var(--text-2)"></p>
+            </div>
+            <div class="glass-2 rounded-2xl p-6 border" style="border-color:var(--border-2)">
+              <h2 class="text-base font-bold text-white mb-4" style="font-family:'Space Grotesk',sans-serif">Metadados do Arquivo</h2>
+              <div id="meta-rows"></div>
+            </div>
+          </div>
+
+          <!-- Right Action Panel -->
+          <div class="flex flex-col gap-4">
+            <div class="glass-2 rounded-2xl p-6 border" style="border-color:var(--border-2)">
+              <h2 class="text-base font-bold text-white mb-4" style="font-family:'Space Grotesk',sans-serif">Ações</h2>
+              <div class="flex flex-col gap-3">
+                <button onclick="openInDrive()" class="btn btn-violet w-full">
+                  <i data-lucide="external-link" class="w-4 h-4"></i> Abrir no Google Drive
+                </button>
+                <button onclick="downloadFile()" class="btn btn-outline w-full">
+                  <i data-lucide="download" class="w-4 h-4"></i> Baixar Arquivo
+                </button>
+                <button onclick="copyLink()" class="btn btn-outline w-full">
+                  <i data-lucide="link" class="w-4 h-4"></i> Copiar Link
+                </button>
+                <div class="divider"></div>
+                <button onclick="openDeleteModal()" class="btn btn-danger w-full">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i> Remover do Drive
+                </button>
+              </div>
+            </div>
+
+            <!-- Classificação -->
+            <div class="glass-2 rounded-2xl p-6 border" style="border-color:var(--border-2)">
+              <div class="flex items-center justify-between mb-3">
+                <h2 class="text-base font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Classificação</h2>
+                <button class="btn btn-ghost btn-sm" id="edit-classification-btn" onclick="toggleClassificationEdit()">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+
+              <!-- View mode -->
+              <div id="classification-view">
+                <p id="classification-warning" class="hidden text-xs mb-3 px-3 py-2 rounded-lg flex items-center gap-2" style="background:rgba(234,179,8,0.12);color:#eab308">
+                  <i data-lucide="alert-triangle" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                  <span>Não foi possível classificar este arquivo automaticamente. Classifique manualmente.</span>
+                </p>
+                <p id="low-confidence-warning" class="hidden text-xs mb-3 px-3 py-2 rounded-lg flex items-center gap-2" style="background:rgba(249,115,22,0.12);color:#f97316">
+                  <i data-lucide="help-circle" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                  <span>Classificação automática com baixa confiança — vale revisar a categoria e as tags.</span>
+                </p>
+                <div class="mb-3">
+                  <span class="text-xs block mb-1" style="color:var(--text-3)">Categoria</span>
+                  <span id="classification-category"></span>
+                </div>
+                <div>
+                  <span class="text-xs block mb-1" style="color:var(--text-3)">Tags</span>
+                  <div id="file-tags" class="flex flex-wrap gap-2"></div>
+                  <p id="no-tags" class="text-xs hidden" style="color:var(--text-3)">Nenhuma tag cadastrada</p>
+                </div>
+              </div>
+
+              <!-- Edit mode -->
+              <div id="classification-form" class="hidden flex flex-col gap-3">
+                <div>
+                  <label class="text-xs block mb-1" style="color:var(--text-3)">Categoria</label>
+                  <input id="edit-category-input" type="text" placeholder="ex: financeiro" autocomplete="off"
+                    style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-1);font-size:13px" />
+                </div>
+                <div>
+                  <label class="text-xs block mb-1" style="color:var(--text-3)">Tags (separadas por vírgula)</label>
+                  <input id="edit-tags-input" type="text" placeholder="ex: contrato, imóvel, 2026" autocomplete="off"
+                    style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-1);font-size:13px" />
+                </div>
+                <div>
+                  <label class="text-xs block mb-1" style="color:var(--text-3)">Descrição</label>
+                  <textarea id="edit-description-input" rows="3" placeholder="Resumo objetivo do conteúdo"
+                    style="width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text-1);font-size:13px;resize:vertical"></textarea>
+                </div>
+                <div class="flex gap-2">
+                  <button class="btn btn-violet btn-sm flex-1" id="save-classification-btn" onclick="saveClassification()">Salvar</button>
+                  <button class="btn btn-outline btn-sm" onclick="toggleClassificationEdit(false)">Cancelar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Modal confirm delete -->
+<div class="modal-backdrop" id="delete-modal">
+  <div class="modal-box">
+    <div class="flex justify-center mb-4">
+      <div class="w-12 h-12 rounded-2xl flex items-center justify-center bg-red-500/10 text-red-400">
+        <i data-lucide="trash-2" class="w-6 h-6"></i>
+      </div>
+    </div>
+    <h2 class="text-xl font-bold text-center text-white mb-2" style="font-family:'Space Grotesk',sans-serif">Excluir este arquivo?</h2>
+    <p class="text-xs text-center mb-6" style="color:var(--text-2)">
+      Esta ação remove o arquivo permanentemente do seu Google Drive.
+    </p>
+    <div class="flex gap-3">
+      <button class="btn btn-outline flex-1" onclick="closeDeleteModal()">Cancelar</button>
+      <button class="btn btn-danger flex-1" id="confirm-delete-btn" onclick="doDelete()">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<script>(function(){var x=new XMLHttpRequest();x.open("GET","/me",false);try{x.send(null);window.__BUSCA_AGIL_USER__=x.status===200?JSON.parse(x.responseText):null;}catch(e){window.__BUSCA_AGIL_USER__=null;}})();</script>
+<script src="/static/js/catalog-client.js"></script>
+<script src="/static/js/file-utils.js"></script>
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/task-notifications.js"></script>
+<script src="/static/js/file-view.js"></script>
+</body>
+</html>

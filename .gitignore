@@ -1,16 +1,13 @@
 .env
 __pycache__/
 *.pyc
-db.sqlite3
 venv/
-# gerado por `collectstatic` (produção, ver docker-compose.prod.yml) —
-# derivado de static/, não é fonte
-staticfiles/
 data/*.lock
 # pouso temporário de upload — o worker apaga assim que confirma o envio
-# pro Drive; nada aqui deveria sobreviver de verdade (ver core/views.py)
+# pro Drive; nada aqui deveria sobreviver de verdade (ver api/app.py)
 media/*
 !media/.gitkeep
-# cache local por usuário — espelho do uploaded_files.json que vive no
-# Drive de cada um (ver core/uploaded_files_store.py); não é fonte da verdade
+# cache local por usuário: catalog.json (espelho do uploaded_files.json do
+# Drive) + profile.json (tokens OAuth + IDs do Drive) — ver api/stores.py;
+# não é fonte da verdade, e profile.json tem segredo (tokens), nunca commitar
 data/users/

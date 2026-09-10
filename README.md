@@ -7,38 +7,48 @@ ou Gemini.
 
 Pra aprender a **usar** o sistema (login, upload, busca, editar
 classificação, excluir arquivos), veja **[GUIA_DE_USO.md](GUIA_DE_USO.md)**.
-Este documento aqui é só sobre **instalar e rodar** o projeto.
+Este documento aqui é só sobre **instalar e rodar** o projeto. Pra entender
+como o código por dentro funciona (containers, fila, por que não tem banco
+de dados), veja **[ARQUITETURA.md](ARQUITETURA.md)**.
 
 ## Estrutura Do Projeto
 
-O projeto segue o padrão Django:
+Sem framework "cheio" nem banco de dados — cinco peças simples:
 
-- `manage.py` na raiz
-- pacote de projeto em `busca_agil/`
-- app principal em `core/`
-- utilitários/IA em `scripts/`
-- templates em `templates/`
-- assets estáticos em `static/`
+- `frontend/` — nginx: serve o HTML/CSS/JS estático e faz proxy das rotas de dados pra `api/`
+- `api/` — Flask: login com Google, upload, busca, status da fila
+- `worker/` — Celery: consome a fila e roda a classificação + upload pro Drive
+- `scripts/` — orquestração de IA (local via Ollama e/ou Gemini), sem dependência de framework
+- `static/` — CSS/JS compartilhado entre as páginas em `frontend/pages/`
 - pouso temporário de upload em `media/` (arquivo some de lá assim que o worker confirma o envio pro Drive)
-- cache local do catálogo de cada usuário em `data/users/<id>.json`
+- cache local (catálogo + tokens OAuth) por usuário em `data/users/<id>/`
 
-Dentro de `core/`, vale destacar:
+Dentro de `api/`, vale destacar:
 
-- `views.py` — rotas HTTP (páginas, upload, busca, exclusão, `post_login_sync`)
-- `tasks.py` — tarefas assíncronas do Celery (classificação + upload pro Drive)
+- `app.py` — rotas HTTP (upload, busca, exclusão, status, fila)
+- `auth.py` — login OAuth2 manual com o Google, sessão (cookie assinado do Flask), `/me`
+- `csrf.py` — proteção CSRF (double-submit cookie)
 - `google_drive.py` — toda a integração com a Drive API (pasta do usuário, catálogo, upload/download/exclusão de arquivos)
-- `models.py` — `DriveProfile`, guarda os IDs da pasta/catálogo de cada usuário no Drive
-- `context_processors.py` — injeta os dados do usuário logado (nome, avatar, cota de armazenamento) em todo template
-- `uploaded_files_store.py` — leitura/escrita do cache local por usuário, com lock de arquivo
+- `stores.py` — leitura/escrita do cache local por usuário (catálogo + perfil), com lock de arquivo — não tem banco de dados nenhum, é tudo JSON em disco
 - `text_match.py` — critério único de busca (normalização de acento + fuzzy matching via `rapidfuzz`), usado tanto pelo filtro no backend quanto (portado em JS) pelo fallback local do frontend
+
+Dentro de `worker/`:
+
+- `celery_app.py` — cria o app Celery (broker/backend = Redis)
+- `tasks.py` — tarefas assíncronas (classificação + upload pro Drive)
 
 Dentro de `scripts/`:
 
 - `processar_upload.py` — orquestrador: tenta a IA local primeiro (se
-  habilitada), cai pro Gemini em qualquer falha
+  habilitada), cai pro Gemini em qualquer falha. Categoria é **aberta** —
+  não existe uma lista fixa de categorias de negócio; cada classificação
+  recebe as categorias que o próprio usuário já usou (via `worker/tasks.py`)
+  como referência, e cria uma nova se nenhuma servir.
 - `local_ai/` — IA local via Ollama (texto, imagem/PDF, vídeo/áudio, busca)
 - `categorizer_gemini.py` / `analisador_busca.py` — classificação e busca via Gemini (nuvem)
-- `extrator_conteudo.py` — extração de texto de documentos/planilhas
+- `extrator_conteudo.py` — extração de texto de documentos/planilhas/links,
+  com tratamento dedicado pra YouTube (título + transcrição/legenda do
+  vídeo via `youtube-transcript-api`, sem precisar de API key do YouTube)
 
 O login com Google já autoriza, no mesmo consentimento, o acesso a uma pasta
 própria (`buscaagil_upload`) no Drive do usuário — é lá que os arquivos
@@ -79,9 +89,9 @@ cd siteBuscaAgil
 ### 2. Rodar Com Docker (Recomendado)
 
 Com Docker instalado (Docker Desktop com integração WSL, ou Docker Engine
-direto no WSL) mais o plugin `docker compose`, todo o resto — Django, worker
-do Celery, Redis e a IA local (Ollama) — sobe com um único script, sem
-precisar instalar Python/venv/Redis/ffmpeg no seu WSL.
+direto no WSL) mais o plugin `docker compose`, todo o resto — frontend,
+api, worker do Celery, Redis e a IA local (Ollama) — sobe com um único
+script, sem precisar instalar Python/venv/Redis/ffmpeg no seu WSL.
 
 1. Configure as credenciais no `.env` (seções **3** e **4** abaixo — os
    passos de configuração de chave são os mesmos, só quem roda o processo
@@ -93,12 +103,12 @@ precisar instalar Python/venv/Redis/ffmpeg no seu WSL.
    ```
 
 O script builda as imagens, sobe o Ollama, baixa os modelos de IA local,
-roda as migrações, sobe o Django e o worker e, ao final, roda uma bateria
-de **smoke tests** (Ollama respondendo com os modelos certos, Django
-respondendo em `:8000`, worker do Celery respondendo a um ping via broker,
-e uma classificação de arquivo de ponta a ponta) — se algum teste crítico
+sobe a api, o worker e o frontend e, ao final, roda uma bateria de
+**smoke tests** (Ollama respondendo com os modelos certos, frontend
+respondendo em `:80`, worker do Celery respondendo a um ping via broker, e
+uma classificação de arquivo de ponta a ponta) — se algum teste crítico
 falhar, o script para e mostra o que verificar. Se tudo passar, acesse
-`http://localhost:8000/`.
+`http://localhost/`.
 
 Comandos do dia a dia depois da primeira vez:
 
@@ -109,9 +119,8 @@ docker compose down       # parar tudo
 ```
 
 Pra desfazer tudo (containers, imagens, volumes com os modelos baixados,
-`db.sqlite3`, cache local) e voltar a um estado zerado — só com o código e
-os arquivos de configuração/instrução, pronto pra rodar `./install.sh` de
-novo do zero:
+cache local) e voltar a um estado zerado — só com o código e os arquivos de
+configuração/instrução, pronto pra rodar `./install.sh` de novo do zero:
 
 ```bash
 ./uninstall.sh
@@ -152,13 +161,14 @@ CELERY_RESULT_BACKEND=redis://localhost:6379/0
 
 Se não forem definidas, esses são os valores padrão já usados pelo projeto
 (no fluxo Docker, o próprio `docker-compose.yml` já sobrescreve isso pra
-apontar pro serviço certo — não precisa mexer).
+apontar pro serviço `redis` — não precisa mexer).
 
 ### 4. Configurar Login E Drive Com O Google
 
 O login do BuscaÁgil é feito **exclusivamente com conta Google** — não existe
-usuário/senha local. No mesmo consentimento, o Google já pede autorização
-pro BuscaÁgil acessar a pasta `buscaagil_upload` no Drive do usuário.
+usuário/senha local nem tabela de usuários (ver `api/auth.py`). No mesmo
+consentimento, o Google já pede autorização pro BuscaÁgil acessar a pasta
+`buscaagil_upload` no Drive do usuário.
 
 Pra isso funcionar, você precisa criar um **Client ID OAuth** no Google
 Cloud Console:
@@ -175,8 +185,8 @@ Cloud Console:
      vão logar (incluindo a sua) em **Usuários de teste**.
 4. **Criar as credenciais** (**APIs e serviços > Credenciais > Criar credenciais > ID do cliente OAuth**):
    - Tipo de aplicativo: **Aplicativo da Web**.
-   - **Origens JavaScript autorizadas**: `http://localhost:8000`
-   - **URIs de redirecionamento autorizados**: `http://localhost:8000/accounts/google/login/callback/`
+   - **Origens JavaScript autorizadas**: `http://localhost`
+   - **URIs de redirecionamento autorizados**: `http://localhost/auth/callback`
 
    Ao salvar, o Google mostra o **Client ID** e o **Client Secret**.
 5. **Colar no `.env`**:
@@ -184,20 +194,20 @@ Cloud Console:
    ```text
    GOOGLE_OAUTH_CLIENT_ID=algo.apps.googleusercontent.com
    GOOGLE_OAUTH_CLIENT_SECRET=sua_client_secret
+   GOOGLE_OAUTH_REDIRECT_URI=http://localhost/auth/callback
    ```
-6. **Rodar as migrações** (o login com Google usa tabelas do `django-allauth`):
-
-   ```bash
-   python manage.py migrate
-   ```
-
-   (No fluxo Docker, o `web` já roda isso sozinho ao subir — não precisa repetir.)
 
 > **Atenção ao host usado no navegador**: as credenciais acima só valem para
-> `http://localhost:8000/`. Se você abrir o site em `http://127.0.0.1:8000/`
-> em vez de `localhost`, o login falha com `redirect_uri_mismatch` (pro
-> Google, são origens diferentes) — use sempre `localhost`, ou cadastre
-> `127.0.0.1` também nas credenciais.
+> `http://localhost/`. Se você abrir o site em `http://127.0.0.1/` em vez de
+> `localhost`, o login falha com `redirect_uri_mismatch` (pro Google, são
+> origens diferentes) — use sempre `localhost`, ou cadastre `127.0.0.1`
+> também nas credenciais.
+
+> **Nota de desenvolvimento**: como o frontend roda em `http://` puro (sem
+> TLS) em `localhost`, o `docker-compose.yml` já define
+> `OAUTHLIB_INSECURE_TRANSPORT=1` no serviço `api` — necessário porque a
+> biblioteca OAuth exige HTTPS por padrão. **Nunca** faça isso num domínio
+> público de verdade; ali o certo é servir tudo atrás de HTTPS.
 
 ### 5. Configurar IA Local (Ollama)
 
@@ -214,8 +224,8 @@ comandos abaixo servem pra quem quiser rodar na mão (fluxo manual, ou pra
 trocar de modelo depois).
 
 **1. Subir o container do Ollama** (no fluxo manual, só o serviço `ollama` —
-o `docker-compose.yml` também define `web`/`worker`, usados pelo
-`./install.sh`):
+o `docker-compose.yml` também define `api`/`worker`/`frontend`/`redis`,
+usados pelo `./install.sh`):
 
 ```bash
 docker compose up -d ollama
@@ -224,18 +234,25 @@ docker compose up -d ollama
 **2. Baixar os modelos** (uma vez só, ficam salvos no volume do container):
 
 ```bash
-docker compose exec ollama ollama pull qwen2.5:3b-instruct
+docker compose exec ollama ollama pull qwen2.5:7b-instruct
 docker compose exec ollama ollama pull moondream
 ```
 
-- `qwen2.5:3b-instruct`: classifica texto/documentos e interpreta a busca
-  (mesmo papel que o Gemini faz hoje).
+- `qwen2.5:7b-instruct`: classifica texto/documentos e interpreta a busca
+  (mesmo papel que o Gemini faz hoje). Mais preciso que o `3b`, ao custo de
+  rodar mais devagar em CPU — se a máquina não aguentar, troque
+  `LOCAL_AI_TEXT_MODEL=qwen2.5:3b-instruct` no `.env` e baixe esse modelo
+  em vez do `7b`.
 - `moondream`: modelo de visão leve (~1.8B, roda bem em CPU) — descreve
   imagens e frames de vídeo/páginas de PDF escaneado em texto, que depois é
   classificado pelo modelo de texto acima.
+- Transcrição de áudio/vídeo (`faster-whisper`) não é modelo do Ollama —
+  baixa sozinha na primeira vez que for usada, tamanho controlado por
+  `LOCAL_AI_WHISPER_MODEL` no `.env` (padrão `small`; `tiny` é mais rápido
+  e menos preciso, `medium`/`large-v3` mais preciso e mais lento).
 
 **3. Instalar o `ffmpeg`** (necessário só pra vídeo/áudio; já vem embutido
-na imagem Docker do `web`/`worker`, só é preciso instalar manualmente no
+na imagem Docker da `api`/`worker`, só é preciso instalar manualmente no
 fluxo sem Docker):
 
 ```bash
@@ -290,25 +307,32 @@ Como o WSL não usa `systemd` por padrão, o Redis precisa ser iniciado
 manualmente com `sudo service redis-server start` toda vez que o WSL for
 reiniciado.
 
-**Rodar as migrações do banco:**
-
-```bash
-python manage.py migrate
-```
-
 **Rodar o worker do Celery** (terminal separado, deixe aberto):
 
 ```bash
-celery -A busca_agil worker --loglevel=info
+export OAUTHLIB_INSECURE_TRANSPORT=1   # só em dev, http:// local — ver seção 4
+celery -A worker.celery_app worker --loglevel=info
 ```
 
-**Rodar o projeto** (outro terminal):
+**Rodar a api** (outro terminal):
 
 ```bash
-python manage.py runserver
+export OAUTHLIB_INSECURE_TRANSPORT=1
+flask --app api.app run --debug
 ```
 
-Depois abra `http://localhost:8000/` no navegador.
+**Servir o frontend** (outro terminal — só arquivos estáticos, qualquer
+servidor HTTP simples resolve; o exemplo abaixo usa o embutido do Python):
+
+```bash
+cd frontend/pages
+python3 -m http.server 8080
+```
+
+No fluxo manual (sem o proxy do nginx) as duas origens são diferentes
+(`:8080` pro frontend, `:5000` pra api) — pra evitar lidar com CORS/cookie
+entre portas, prefira o fluxo Docker (seção 2) mesmo pra desenvolver; ele já
+resolve isso com o proxy do nginx numa origem só.
 
 **Resumo do dia a dia**, depois que o ambiente já estiver configurado uma vez:
 
@@ -316,109 +340,29 @@ Depois abra `http://localhost:8000/` no navegador.
 sudo service redis-server start        # 1. Redis
 docker compose up -d ollama            # 2. IA local (Ollama)
 source venv/bin/activate               # 3. ambiente virtual
-celery -A busca_agil worker --loglevel=info   # 4. worker (terminal separado)
-python manage.py runserver             # 5. servidor Django (outro terminal)
+celery -A worker.celery_app worker --loglevel=info   # 4. worker (terminal separado)
+flask --app api.app run --debug        # 5. api (outro terminal)
 ```
-
-## Checklist De Produção
-
-Por padrão o projeto sobe em **modo desenvolvimento** (`DJANGO_DEBUG=true`,
-`ALLOWED_HOSTS=["*"]`, chave secreta de exemplo, servidor de desenvolvimento
-do Django). Antes de subir num servidor real:
-
-1. **Gere uma `SECRET_KEY` de verdade** e defina no `.env`:
-   ```bash
-   python -c "import secrets; print(secrets.token_urlsafe(50))"
-   ```
-   ```text
-   DJANGO_SECRET_KEY=<a chave gerada>
-   ```
-2. **Desative o modo debug e restrinja os hosts**:
-   ```text
-   DJANGO_DEBUG=false
-   DJANGO_ALLOWED_HOSTS=seudominio.com.br,www.seudominio.com.br
-   DJANGO_CSRF_TRUSTED_ORIGINS=https://seudominio.com.br
-   ```
-   Com `DJANGO_DEBUG=false`, o Django recusa subir (`RuntimeError` explícito
-   em `busca_agil/settings.py`) se `DJANGO_SECRET_KEY` ou
-   `DJANGO_ALLOWED_HOSTS` não estiverem definidas — isso é proposital, pra
-   nunca subir em produção com os valores de desenvolvimento por engano.
-3. **Atualize as credenciais OAuth do Google** (seção 4) com a URI de
-   redirecionamento do domínio real:
-   `https://seudominio.com.br/accounts/google/login/callback/` — e mova o
-   app de "Teste" pra "Em produção" na tela de consentimento OAuth.
-4. **Suba com o servidor de produção (Gunicorn), não o `runserver`**: use o
-   override `docker-compose.prod.yml` (já pronto no repo) junto com o
-   principal:
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-   ```
-   Isso troca o `command` do `web` por Gunicorn (3 workers) e roda
-   `collectstatic` antes de subir — os arquivos de `static/` passam a ser
-   servidos comprimidos pelo próprio processo Django via
-   [WhiteNoise](https://whitenoise.readthedocs.io/) (`STATIC_ROOT`/`STORAGES`
-   em `busca_agil/settings.py`), sem precisar configurar isso num proxy à
-   parte.
-5. **Coloque um proxy reverso (Nginx) na frente** pra TLS/domínio — exemplo
-   mínimo:
-   ```nginx
-   server {
-       listen 443 ssl;
-       server_name seudominio.com.br;
-       # ssl_certificate / ssl_certificate_key (ex.: Let's Encrypt / certbot)
-
-       location / {
-           proxy_pass http://127.0.0.1:8000;
-           proxy_set_header Host $host;
-           proxy_set_header X-Forwarded-Proto $scheme;
-           proxy_set_header X-Real-IP $remote_addr;
-       }
-   }
-   ```
-   Com um proxy desses de fato na frente terminando TLS, defina também
-   `DJANGO_BEHIND_PROXY=true` no `.env` — sem isso, `request.is_secure()`
-   fica errado e pode gerar loop de redirecionamento com
-   `DJANGO_SECURE_SSL_REDIRECT=true`. **Não** ative `DJANGO_BEHIND_PROXY` se
-   o Django for acessado diretamente (sem proxy), pois o header que ele
-   passa a confiar (`X-Forwarded-Proto`) pode ser forjado por qualquer
-   client nesse caso.
-6. **Redis e o worker Celery** já rodam como serviços supervisionados pelo
-   próprio Docker (`restart: always` no `docker-compose.prod.yml`) — sem
-   Docker, use systemd/supervisor.
-7. **Banco de dados**: `db.sqlite3` é suficiente para o volume de uso do
-   Django puro (sessões, contas Google), mas considere Postgres se o
-   volume de usuários crescer.
-
-**Verificação extra**: rode `python manage.py check --deploy` com as
-variáveis de produção definidas — ele confere coisas que este checklist não
-cobre (ex.: `SECURE_HSTS_SECONDS`, que habilita HTTP Strict Transport
-Security. **Não ative isso de primeira**: é irreversível pelo navegador do
-usuário até expirar o prazo configurado — só considere depois que HTTPS
-estiver funcionando de forma estável no domínio real).
-
-**Proteção CSRF**: os endpoints que alteram dado (upload, adicionar link,
-editar classificação, excluir arquivo) exigem o cookie/token CSRF padrão do
-Django — já vem funcionando (`core/views.py::_render_page` garante que toda
-página sete o cookie, e o frontend já manda o header `X-CSRFToken` em
-`static/js/catalog-client.js::getCsrfToken()`). Não marque essas views como
-`csrf_exempt` de novo.
 
 ## Solução De Problemas
 
-- Se o upload retornar erro 500 com `redis.exceptions.ConnectionError`, o
-  Redis não está rodando (fluxo manual) — repita
-  `sudo service redis-server start`, ou no Docker confira
-  `docker compose logs worker`.
+- Se o upload retornar erro com `redis.exceptions.ConnectionError`, o Redis
+  não está rodando (fluxo manual) — repita `sudo service redis-server
+  start`, ou no Docker confira `docker compose logs redis`.
 - Se o upload for aceito mas o arquivo ficar travado com status
   `"processing"` para sempre (nunca vira `"done"` nem `"error"`), o worker
   do Celery não está rodando/consumindo — no fluxo manual, rode
-  `celery -A busca_agil worker --loglevel=info`; no Docker, confira
+  `celery -A worker.celery_app worker --loglevel=info`; no Docker, confira
   `docker compose ps` e `docker compose logs worker`.
 - Sem `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` configurados, o
   botão "Continuar com Google" redireciona pro Google e volta com erro —
   configure as credenciais (seção 4).
 - Erro `redirect_uri_mismatch` no login: veja o aviso no fim da seção 4
-  (host `localhost` vs `127.0.0.1`).
+  (host `localhost` vs `127.0.0.1`, e `GOOGLE_OAUTH_REDIRECT_URI` tem que
+  bater exatamente com o cadastrado no Google Cloud Console).
+- Erro `insecure_transport` no login: falta `OAUTHLIB_INSECURE_TRANSPORT=1`
+  no ambiente da `api` (já vem definido no `docker-compose.yml`; no fluxo
+  manual, exporte antes de rodar `flask run`).
 - Se o login funcionar mas cair na tela "Não foi possível conectar ao seu
   Google Drive" (`auth.html`), o token do Google não tem o escopo do Drive
   (geralmente porque o consentimento foi negado, ou o app ainda está em modo

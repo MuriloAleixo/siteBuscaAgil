@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Perfil & Google Drive — BuscaÁgil</title>
+  <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg" />
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter','sans-serif'], mono: ['Space Grotesk','monospace'] } } } }
+  </script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body class="grid-bg">
+
+<div class="dashboard-layout">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <a href="dashboard.html" class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl flex items-center justify-center pulse" style="background:linear-gradient(135deg,var(--violet),var(--cyan))">
+          <i data-lucide="search" class="w-4 h-4 text-white"></i>
+        </div>
+        <span class="logo-text text-lg text-white">Busca<span class="gradient-text">Ágil</span></span>
+      </a>
+    </div>
+
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Mecanismo de Busca</span>
+      <a href="dashboard.html" class="nav-item">
+        <i data-lucide="search" class="nav-icon"></i>
+        <span>Buscar Arquivos</span>
+      </a>
+      <a href="upload.html" class="nav-item">
+        <i data-lucide="upload-cloud" class="nav-icon"></i>
+        <span>Enviar Arquivo</span>
+      </a>
+      <span class="nav-section-label">Sua Conta</span>
+      <a href="profile.html" class="nav-item active">
+        <i data-lucide="user-circle" class="nav-icon"></i>
+        <span>Perfil / Drive</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="flex items-center gap-3 p-3 rounded-xl" style="background:var(--bg-card);border:1px solid var(--border)">
+        <img id="sidebar-avatar" src="" alt="Avatar" class="avatar avatar-sm" />
+        <div class="flex-1 min-w-0">
+          <p id="sidebar-name" class="text-xs font-bold text-white truncate" style="font-family:'Space Grotesk',sans-serif"></p>
+          <p class="text-xs truncate text-cyan-400">Drive Conectado ✓</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- ── MAIN CONTENT ── -->
+  <div class="main-content">
+    <header class="top-header">
+      <button class="btn btn-ghost btn-icon lg:hidden" id="sidebar-toggle">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+      <div class="flex-1">
+        <h2 class="text-sm font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Perfil & Configurações do Drive</h2>
+      </div>
+    </header>
+
+    <main class="page-content fade-up">
+      <div class="max-w-3xl mx-auto">
+
+        <!-- User Card -->
+        <div class="profile-card mb-6 glass-2 border" style="border-color:var(--border-2)">
+          <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+            <img id="profile-avatar" src="" alt="Avatar" class="avatar avatar-lg" />
+            <div class="flex-1 text-center sm:text-left">
+              <div class="flex items-center justify-center sm:justify-start gap-3 mb-1">
+                <h1 id="profile-name" class="text-2xl font-extrabold text-white" style="font-family:'Space Grotesk',sans-serif"></h1>
+                <span id="profile-plan" class="type-pill" style="background:rgba(124,58,237,0.2);color:var(--violet-light)"></span>
+              </div>
+              <p id="profile-email" class="text-sm mb-3" style="color:var(--text-2)"></p>
+
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs" style="background:rgba(34,211,238,0.1);color:var(--cyan);border:1px solid rgba(34,211,238,0.2)">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                <span>Google Drive Conectado</span>
+              </div>
+            </div>
+            <button onclick="logout()" class="btn btn-danger btn-sm flex-shrink-0">
+              <i data-lucide="log-out" class="w-4 h-4"></i> Desconectar
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          <div class="stat-card text-center">
+            <div class="text-2xl font-extrabold text-white mb-1" style="font-family:'Space Grotesk',sans-serif" id="stat-total"></div>
+            <div class="text-xs" style="color:var(--text-3)">Arquivos na Busca</div>
+          </div>
+          <div class="stat-card text-center">
+            <div class="text-2xl font-extrabold text-cyan-400 mb-1" style="font-family:'Space Grotesk',sans-serif" id="stat-images"></div>
+            <div class="text-xs" style="color:var(--text-3)">Imagens</div>
+          </div>
+          <div class="stat-card text-center">
+            <div class="text-2xl font-extrabold text-orange-400 mb-1" style="font-family:'Space Grotesk',sans-serif" id="stat-pdfs"></div>
+            <div class="text-xs" style="color:var(--text-3)">PDFs</div>
+          </div>
+          <div class="stat-card text-center">
+            <div class="text-2xl font-extrabold text-purple-400 mb-1" style="font-family:'Space Grotesk',sans-serif" id="stat-videos"></div>
+            <div class="text-xs" style="color:var(--text-3)">Vídeos</div>
+          </div>
+        </div>
+
+        <!-- Account Info Box -->
+        <div class="profile-card mb-6">
+          <h2 class="text-base font-bold text-white mb-4" style="font-family:'Space Grotesk',sans-serif">Detalhes da Conta Google</h2>
+
+          <div class="setting-row">
+            <div>
+              <p class="text-sm font-medium text-white">Provedor de Login</p>
+              <p class="text-xs" style="color:var(--text-3)">OAuth2 do Google</p>
+            </div>
+            <span class="text-xs text-green-400 font-semibold">Ativo ✓</span>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <p class="text-sm font-medium text-white">Status da Indexação</p>
+              <p class="text-xs" style="color:var(--text-3)">Atualização automática de arquivos</p>
+            </div>
+            <span class="text-xs text-purple-300 font-semibold">Sincronizado</span>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <p class="text-sm font-medium text-white">Membro desde</p>
+              <p class="text-xs" style="color:var(--text-3)">Data de vínculo da conta</p>
+            </div>
+            <span class="text-xs text-white" id="member-since"></span>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="profile-card mb-6">
+          <h2 class="text-base font-bold text-white mb-4" style="font-family:'Space Grotesk',sans-serif">Preferências de Busca</h2>
+
+          <div class="setting-row">
+            <div>
+              <p class="text-sm font-medium text-white">Destaque de termos digitados</p>
+              <p class="text-xs" style="color:var(--text-3)">Grifar em roxo a palavra encontrada no título</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-row">
+            <div>
+              <p class="text-sm font-medium text-white">Atalho de busca rápido (⌘K)</p>
+              <p class="text-xs" style="color:var(--text-3)">Focar caixa de pesquisa usando atalho do teclado</p>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" checked />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>(function(){var x=new XMLHttpRequest();x.open("GET","/me",false);try{x.send(null);window.__BUSCA_AGIL_USER__=x.status===200?JSON.parse(x.responseText):null;}catch(e){window.__BUSCA_AGIL_USER__=null;}})();</script>
+<script src="/static/js/catalog-client.js"></script>
+<script src="/static/js/file-utils.js"></script>
+<script src="/static/js/auth.js"></script>
+<script src="/static/js/task-notifications.js"></script>
+<script src="/static/js/profile.js"></script>
+</body>
+</html>

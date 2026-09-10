@@ -1,5 +1,8 @@
 #!/bin/sh
 set -e
 
-redis-server --daemonize yes --save "" --dir /tmp --bind 0.0.0.0 --protected-mode no
-exec celery -A busca_agil worker --loglevel=info
+# Redis agora é um container próprio (serviço "redis" no docker-compose.yml)
+# em vez de embutido aqui — mais fácil de explicar "o worker consome uma
+# fila que vive num broker separado", que é o próprio conceito de sistema
+# distribuído que este projeto quer mostrar.
+exec celery -A worker.celery_app worker --loglevel=info

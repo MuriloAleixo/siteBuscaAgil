@@ -1,7 +1,7 @@
 # Dependencias Python do BuscaAgil
 # Instale com: pip install -r requirements.txt
 
-Django==5.2.17
+Flask==3.1.2
 python-dotenv==1.1.1
 google-genai==2.17.0
 pydantic==2.13.4
@@ -11,19 +11,18 @@ xlrd==2.0.2
 python-docx==1.2.0
 requests==2.34.2
 beautifulsoup4==4.15.0
+# transcrição/legenda de vídeos do YouTube sem precisar de API key (ver
+# scripts/extrator_conteudo.py::_extrair_youtube) — pinado na 0.6.x porque
+# a API usada aqui (YouTubeTranscriptApi.get_transcript classmethod) mudou
+# na 1.x
+youtube-transcript-api==0.6.3
 celery==5.4.0
 redis==5.0.8
 filelock==3.16.1
 rapidfuzz==3.14.1
-gunicorn==26.2.0
-whitenoise==6.12.0
-django-allauth==65.19.1
 google-api-python-client==2.198.0
 google-auth==2.56.3
-# django-allauth precisa disso pra verificar o id_token JWT que o Google
-# devolve no login (allauth não declara como dependência obrigatória)
-PyJWT==2.13.0
-cryptography==50.0.0
+google-auth-oauthlib==1.2.2
 
 # IA local (Ollama) - classificacao de PDF/video/audio sem depender do Gemini
 pypdf==6.17.0

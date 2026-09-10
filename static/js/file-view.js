@@ -240,7 +240,7 @@ async function saveClassification() {
     currentFile.tags = f.tags || [];
     currentFile.description = f.description || '';
     // Reclassificação manual: backend já zerou confidence/scores (ver
-    // core/views.py::update_file_metadata) — refletir aqui pra badge de
+    // api/app.py::update_file_metadata) — refletir aqui pra badge de
     // baixa confiança sumir sem precisar recarregar a página.
     currentFile.confidence = null;
     currentFile.classificationSource = 'manual';

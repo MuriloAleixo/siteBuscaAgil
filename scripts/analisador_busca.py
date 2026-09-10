@@ -3,15 +3,21 @@ analisador_busca.py
 
 Usa a API do Gemini para interpretar o texto digitado no campo de busca e
 sugerir quais categorias/tags do catálogo provavelmente correspondem à
-intenção do usuário. O backend usa essa saída para filtrar
-data/uploaded_files.json por 'category'/'tags' em vez de só um "contains"
-no nome do arquivo.
+intenção do usuário. O backend (api/app.py::smart_search) usa essa saída
+pra filtrar/ranquear o catálogo do usuário por 'category'/'tags' em vez de
+só um "contains" no nome do arquivo.
+
+`candidate_categories` não é uma lista fixa de negócio — é o conjunto de
+categorias que JÁ existem no catálogo real do usuário (categoria é aberta,
+criada dinamicamente na classificação, ver scripts/processar_upload.py),
+passado como referência pra não sugerir uma categoria que o usuário nunca
+usou.
 
 Uso programático:
     from scripts.analisador_busca import BuscaAnalyzer
 
     analyzer = BuscaAnalyzer()
-    analise = analyzer.analisar("nota fiscal de marco", CATEGORIAS_POSSIVEIS, known_tags)
+    analise = analyzer.analisar("nota fiscal de marco", known_categories, known_tags)
     # analise.categorias -> ["nota fiscal"]
     # analise.tags       -> ["nota fiscal", "marco", "março", "fiscal"]
 """
@@ -23,8 +29,12 @@ from google import genai
 from pydantic import BaseModel, Field
 
 
-# Mesmo modelo usado na classificação de upload (scripts/categorizer_gemini.py):
-# rápido/barato o suficiente para interpretar uma consulta curta de busca.
+# Fica no Flash-Lite (diferente de categorizer_gemini.py, que usa o Flash
+# "cheio") de propósito: busca dispara uma chamada a CADA consulta digitada
+# (bem mais volume que classificar upload, que é só uma vez por arquivo) —
+# aqui o que importa é ficar dentro da cota gratuita e responder rápido; a
+# tarefa (mapear uma consulta curta pra categorias/tags já existentes) é
+# simples o bastante pro Lite dar conta.
 DEFAULT_MODEL = "gemini-3.5-flash-lite"
 
 

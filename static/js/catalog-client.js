@@ -17,7 +17,7 @@ const FILE_TYPES = {
 
 // Sem dados estáticos: a lista é populada em runtime por loadUploadedFiles(),
 // que busca os arquivos reais em /files (catálogo do usuário logado, ver
-// core/uploaded_files_store.py).
+// api/stores.py).
 const MOCK_FILES = [];
 
 // =============================================================
@@ -45,10 +45,10 @@ function getFileById(id) {
   return MOCK_FILES.find((f) => f.id === id) || null;
 }
 
-// Lê o cookie "csrftoken" que o Django seta em toda página (ver
-// core/views.py::_render_page) — precisa ir no header X-CSRFToken de
-// qualquer POST (upload, add-link, editar classificação, excluir), senão o
-// Django recusa com 403 (CsrfViewMiddleware).
+// Lê o cookie "csrftoken" que a api seta em toda resposta (ver
+// api/csrf.py) — precisa ir no header X-CSRFToken de qualquer POST
+// (upload, add-link, editar classificação, excluir), senão a api recusa
+// com 403.
 function getCsrfToken() {
   const match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : "";
@@ -63,6 +63,12 @@ function getCsrfToken() {
 // =============================================================
 
 const SEARCH_FUZZY_THRESHOLD = 80;
+
+// Só pro tier "solto" (fuzzy sobre nome+descrição+categoria+tags, quando
+// nada mais específico bateu) — mais rígido que o SEARCH_FUZZY_THRESHOLD
+// geral pra não deixar uma query curta bater raso em qualquer arquivo
+// (mesmo critério de api/text_match.py::FALLBACK_FUZZY_THRESHOLD).
+const FALLBACK_FUZZY_THRESHOLD = 85;
 
 function normalizeText(text) {
   return (text || "")
@@ -120,14 +126,21 @@ function fuzzyScore(query, candidate) {
 function fileRelevance(file, query) {
   const category = normalizeText(file.category);
   const tags = (file.tags || []).map(normalizeText);
+  const normQuery = normalizeText(query);
+  const normName = normalizeText(file.name);
 
-  if (category && category === normalizeText(query)) return 100;
-  if (tags.includes(normalizeText(query))) return 98;
+  if (category && category === normQuery) return 100;
+  if (tags.includes(normQuery)) return 98;
+  // A consulta aparece literalmente no nome do arquivo — sinal forte
+  // demais pra depender só de bater exato com a categoria/tag (evita
+  // falso negativo quando o nome do arquivo já entrega a resposta).
+  if (normQuery && normName.includes(normQuery)) return 96;
 
   const haystack = [file.name, file.description, file.category, (file.tags || []).join(" ")]
     .filter(Boolean)
     .join(" ");
-  return fuzzyScore(query, haystack);
+  const fallbackScore = fuzzyScore(query, haystack);
+  return fallbackScore < FALLBACK_FUZZY_THRESHOLD ? 0 : fallbackScore;
 }
 
 function searchFiles(query, filterType = "all") {
@@ -147,16 +160,16 @@ function searchFiles(query, filterType = "all") {
 }
 
 // =============================================================
-// Real uploaded files — fetched from the Django backend (/files)
+// Real uploaded files — fetched from the api backend (/files)
 // and merged into MOCK_FILES so dashboard/search reflect uploads.
 // =============================================================
 const UPLOADED_FILES_API_URL =
   window.BUSCA_AGIL_FILES_URL ||
-  (window.location.protocol === "file:" ? "http://localhost:8000/files" : "/files");
+  (window.location.protocol === "file:" ? "http://localhost/files" : "/files");
 
 const SMART_SEARCH_API_URL =
   window.BUSCA_AGIL_SEARCH_URL ||
-  (window.location.protocol === "file:" ? "http://localhost:8000/search-query" : "/search-query");
+  (window.location.protocol === "file:" ? "http://localhost/search-query" : "/search-query");
 
 // Abaixo disso, uma classificação feita por IA é considerada "duvidosa" e
 // vale sinalizar na UI pra revisão — classificação manual nunca entra aqui
