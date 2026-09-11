@@ -12,10 +12,10 @@ python-docx==1.2.0
 requests==2.34.2
 beautifulsoup4==4.15.0
 # transcrição/legenda de vídeos do YouTube sem precisar de API key (ver
-# scripts/extrator_conteudo.py::_extrair_youtube) — pinado na 0.6.x porque
-# a API usada aqui (YouTubeTranscriptApi.get_transcript classmethod) mudou
-# na 1.x
-youtube-transcript-api==0.6.3
+# scripts/extrator_conteudo.py::_extrair_youtube). A 0.6.x não suporta
+# Python 3.14 (imagem base do Dockerfile) — usa a API 1.x
+# (YouTubeTranscriptApi().fetch(...), não mais o classmethod get_transcript)
+youtube-transcript-api==1.2.4
 celery==5.4.0
 redis==5.0.8
 filelock==3.16.1

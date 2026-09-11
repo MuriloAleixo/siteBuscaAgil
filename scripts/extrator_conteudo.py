@@ -29,15 +29,18 @@ MIME_TYPES_NATIVOS = {
     ".png": "image/png",
 }
 
-YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
-
 
 def eh_link(origem: str) -> bool:
     return urlparse(origem).scheme in ("http", "https")
 
 
 def _eh_youtube(url: str) -> bool:
-    return urlparse(url).netloc.lower() in YOUTUBE_HOSTS
+    # Checa se "youtube.com"/"youtu.be" aparece no host (em vez de bater
+    # contra um set fixo de hosts exatos) pra cobrir subdomínios que
+    # aparecem na prática (m.youtube.com, music.youtube.com, links
+    # compartilhados de dentro do app etc.) sem precisar listar cada um.
+    host = urlparse(url).netloc.lower()
+    return host.endswith("youtube.com") or host.endswith("youtu.be")
 
 
 def _extrair_txt(caminho: str) -> str:
@@ -162,6 +165,9 @@ def _extrair_youtube(url: str) -> str:
     """
     import requests
 
+    video_id = _extrair_video_id_youtube(url)
+    logger.info("Extraindo conteúdo do YouTube: url='%s' video_id='%s'", url, video_id)
+
     partes = []
     try:
         resp = requests.get(
@@ -175,25 +181,37 @@ def _extrair_youtube(url: str) -> str:
             partes.append(f"Título do vídeo: {info['title']}")
         if info.get("author_name"):
             partes.append(f"Canal: {info['author_name']}")
-    except requests.RequestException as exc:
+    except (requests.RequestException, ValueError) as exc:
+        # ValueError cobre resp.json() falhando (corpo não é JSON válido) —
+        # requests.exceptions.JSONDecodeError é subclasse de ValueError, não
+        # de RequestException, então sem isso o erro escapava sem log.
         logger.warning("Não foi possível buscar metadados oEmbed do YouTube para '%s': %s", url, exc)
 
-    video_id = _extrair_video_id_youtube(url)
     if video_id:
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
 
-            transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=["pt", "pt-BR", "en"])
-            texto_legendas = " ".join(item["text"] for item in transcript).strip()
+            # API 1.x: instância + .fetch() (o classmethod .get_transcript()
+            # da 0.6.x foi removido) — devolve um FetchedTranscript iterável
+            # de snippets com atributo .text.
+            transcript = YouTubeTranscriptApi().fetch(video_id, languages=["pt", "pt-BR", "en"])
+            texto_legendas = " ".join(snippet.text for snippet in transcript).strip()
             if texto_legendas:
                 partes.append(f"Transcrição/legenda do vídeo:\n{texto_legendas}")
         except Exception as exc:  # noqa: BLE001 - nem todo vídeo tem legenda; melhor sem do que quebrar
             logger.warning("Não foi possível obter a transcrição do YouTube '%s': %s", video_id, exc)
 
     if not partes:
-        # Sem oEmbed nem legenda (vídeo privado/removido/região bloqueada) —
-        # cai pro scraping genérico como último recurso.
-        return _extrair_link(url)
+        # NUNCA cai pro scraping genérico de HTML aqui: a página do YouTube
+        # é uma SPA praticamente vazia de conteúdo real no HTML cru — o que
+        # sobra é rodapé institucional (links "Sobre"/"Imprensa"/direitos
+        # autorais da Google LLC), que já classificou vídeos errado no
+        # passado por parecer conteúdo real sem ser. Melhor falhar alto e
+        # deixar o arquivo sem categoria do que classificar com lixo.
+        raise RuntimeError(
+            f"Não foi possível obter título nem transcrição do vídeo do YouTube '{url}' "
+            "(oEmbed e legendas falharam — confira os logs do worker pra ver o motivo)."
+        )
 
     return "\n\n".join(partes)
 
