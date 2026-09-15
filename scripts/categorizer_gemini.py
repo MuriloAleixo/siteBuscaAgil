@@ -20,11 +20,23 @@ Setup:
     2. export GEMINI_API_KEY="sua_chave_aqui"
 """
 
+import logging
 import os
+import time
 from typing import List
 
 from google import genai
+from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
+
+# Backoff entre tentativas quando o Gemini responde 5xx (sobrecarga
+# momentânea do lado deles, não erro da nossa chamada) — 2 tentativas extras
+# costuma bastar pra um pico passageiro passar, sem prender o worker por
+# muito tempo numa tarefa que já é best-effort.
+_MAX_TENTATIVAS = 3
+_BACKOFF_SEGUNDOS = (3, 8)
 
 
 # "gemini-3.5-flash" (sem "-lite"): mais preciso que o Flash-Lite pra
@@ -124,13 +136,29 @@ class GeminiCategorizer:
         else:
             raise ValueError(f"tipo de conteúdo desconhecido: {conteudo['tipo']}")
 
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=contents,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": ClassificacaoArquivo,
-            },
-        )
-
-        return response.parsed
+        for tentativa in range(1, _MAX_TENTATIVAS + 1):
+            try:
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=contents,
+                    config={
+                        "response_mime_type": "application/json",
+                        "response_schema": ClassificacaoArquivo,
+                    },
+                )
+                return response.parsed
+            except genai_errors.ServerError as exc:
+                # 5xx = sobrecarga/instabilidade momentânea do lado do
+                # Gemini, não um erro da nossa chamada (ex.: 503 "high
+                # demand") — vale tentar de novo. 4xx (ClientError, ex.:
+                # chave inválida, request malformado) não é retentado: só
+                # gastaria tempo repetindo um erro que não vai se resolver
+                # sozinho.
+                if tentativa == _MAX_TENTATIVAS:
+                    raise
+                espera = _BACKOFF_SEGUNDOS[min(tentativa - 1, len(_BACKOFF_SEGUNDOS) - 1)]
+                logger.warning(
+                    "Gemini respondeu erro de servidor (tentativa %d/%d), tentando de novo em %ds: %s",
+                    tentativa, _MAX_TENTATIVAS, espera, exc,
+                )
+                time.sleep(espera)

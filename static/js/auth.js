@@ -42,3 +42,28 @@ function requireAuth() {
   }
   return true;
 }
+
+// Preenche um <img> de avatar com a foto de perfil do Google, com duas
+// proteções contra o ícone de "imagem quebrada":
+//   1. referrerPolicy="no-referrer" — o CDN de fotos do Google
+//      (lh3.googleusercontent.com) pode recusar a requisição dependendo do
+//      header Referer mandado pelo navegador; sem essa política, a foto
+//      falhava silenciosamente pra algumas contas/navegadores.
+//   2. onerror com fallback pra um avatar gerado (iniciais do nome) — cobre
+//      o caso de a conta Google não ter foto (user.avatar vazio) ou a
+//      imagem falhar de qualquer outro jeito.
+function setAvatar(imgEl, user) {
+  if (!imgEl || !user) return;
+  const initial = (user.name || user.email || "?").trim().charAt(0).toUpperCase();
+  const fallback =
+    "data:image/svg+xml," +
+    encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" rx="32" fill="#7c3aed"/><text x="32" y="43" font-family="'Space Grotesk',sans-serif" font-size="28" fill="#fff" text-anchor="middle">${initial}</text></svg>`
+    );
+  imgEl.referrerPolicy = "no-referrer";
+  imgEl.onerror = () => {
+    imgEl.onerror = null;
+    imgEl.src = fallback;
+  };
+  imgEl.src = user.avatar || fallback;
+}

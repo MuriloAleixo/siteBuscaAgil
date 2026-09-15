@@ -79,6 +79,40 @@ def _extrair_docx(caminho: str) -> str:
     return "\n".join(partes)
 
 
+def _extrair_pptx(caminho: str) -> str:
+    """Requer: pip install python-pptx --break-system-packages
+
+    Extrai o texto de cada slide (título, corpo, tabelas) e também as
+    anotações do apresentador (speaker notes) — muitas vezes é lá que está
+    o contexto real do que o slide fala, não só no texto visível."""
+    from pptx import Presentation
+
+    prs = Presentation(caminho)
+    partes = []
+    for i, slide in enumerate(prs.slides, start=1):
+        textos_slide = []
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for paragrafo in shape.text_frame.paragraphs:
+                    texto = "".join(run.text for run in paragrafo.runs)
+                    if texto.strip():
+                        textos_slide.append(texto)
+            if shape.has_table:
+                for linha in shape.table.rows:
+                    textos_slide.append(" | ".join(celula.text for celula in linha.cells))
+
+        notas = ""
+        if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+            notas = slide.notes_slide.notes_text_frame.text.strip()
+
+        bloco = f"### Slide {i}\n" + "\n".join(textos_slide)
+        if notas:
+            bloco += f"\nAnotações: {notas}"
+        partes.append(bloco)
+
+    return "\n\n".join(partes)
+
+
 def _extrair_doc(caminho: str) -> str:
     """
     .doc é um formato binário legado (não é ZIP como .docx), então
@@ -244,6 +278,7 @@ def preparar_conteudo(origem: str) -> dict:
         ".xls": _extrair_xlsx_xls,
         ".docx": _extrair_docx,
         ".doc": _extrair_doc,
+        ".pptx": _extrair_pptx,
     }
 
     if ext not in extratores_texto:

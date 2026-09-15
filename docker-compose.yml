@@ -5,6 +5,12 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    # Sem isso, classificar um vídeo (qwen 7b + moondream, tudo em CPU) podia
+    # tomar todos os núcleos/RAM do host e travar a máquina inteira (WSL2 não
+    # limita por conta própria). Ajustável via .env se a sua máquina aguentar
+    # mais ou precisar de menos.
+    cpus: ${OLLAMA_CPUS:-6}
+    mem_limit: ${OLLAMA_MEM_LIMIT:-6g}
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 10s
@@ -50,8 +56,16 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      # Prefork padrão do Celery sobe 1 processo por núcleo — pesado à toa
+      # pra tarefas que já são CPU-bound sozinhas (transcrição/classificação
+      # local). Ver worker/entrypoint.sh. Ajustável no .env.
+      CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-1}
     env_file:
       - .env
+    # Some da RAM/CPU do host (faster-whisper + manuseio de frames), além do
+    # que o container `ollama` já reserva pra si — ver comentário lá.
+    cpus: ${WORKER_CPUS:-2}
+    mem_limit: ${WORKER_MEM_LIMIT:-3g}
     depends_on:
       - ollama
       - redis

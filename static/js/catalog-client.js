@@ -194,6 +194,12 @@ function mapUploadedFileToCard(f) {
     size: f.size,
     createdAt: f.created_at,
     updatedAt: f.created_at,
+    // Quando a tentativa de processamento ATUAL começou — igual a
+    // createdAt no primeiro upload, mas reprocess_file/restart_file (ver
+    // api/app.py) atualizam isso sozinhos a cada reprocessamento. Fallback
+    // pra createdAt cobre entries antigas, gravadas antes desse campo
+    // existir.
+    processingStartedAt: f.processing_started_at || f.created_at,
     previewUrl: f.type === "image" ? f.url : null,
     driveUrl: f.url,
     starred: false,

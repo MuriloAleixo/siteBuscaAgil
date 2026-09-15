@@ -11,3 +11,13 @@ media/*
 # Drive) + profile.json (tokens OAuth + IDs do Drive) — ver api/stores.py;
 # não é fonte da verdade, e profile.json tem segredo (tokens), nunca commitar
 data/users/
+# log de processamento (SQLite, ver api/processing_log.py) — dado local por
+# instalação, não fonte da verdade de nada; *-wal/-shm são os arquivos
+# auxiliares do modo WAL (concorrência entre os processos api/worker)
+data/processing.db
+data/processing.db-wal
+data/processing.db-shm
+# backups gerados por ./backup.sh --out (ver backup.sh) — contém .env e
+# tokens OAuth em texto puro, nunca commitar
+buscaagil-backup-*.tar.gz
+*.before-restore-*

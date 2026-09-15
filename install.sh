@@ -11,6 +11,11 @@ cd "$(dirname "$0")"
 
 TEXT_MODEL="qwen2.5:7b-instruct"
 VISION_MODEL="moondream"
+# Modelo menor, dedicado à busca (LOCAL_AI_SEARCH_MODEL) — diferente do
+# TEXT_MODEL acima: busca dispara uma chamada a CADA consulta digitada, não
+# uma vez por arquivo, então precisa ser rápido (ver
+# scripts/local_ai/busca_analyzer_local.py).
+SEARCH_MODEL="qwen2.5:3b-instruct"
 
 echo "==> Verificando pré-requisitos..."
 if ! command -v docker >/dev/null 2>&1; then
@@ -35,6 +40,18 @@ if [ ! -f .env ]; then
     read -rp "Pressione ENTER quando terminar de editar o .env (ou Ctrl+C pra sair e editar com calma)... "
 fi
 
+echo "==> Preparando pastas locais..."
+# Criadas AQUI (pelo usuário do host) de propósito: api/worker rodam como
+# root dentro do container (sem USER no Dockerfile) — se essas pastas não
+# existirem ainda quando o container subir, é ele quem cria (mkdir
+# automático em api/stores.py/processing_log.py), e o bind mount reflete
+# esse dono root de volta pro host. Depois disso o próprio usuário do host
+# não consegue mais escrever/apagar ali (ex.: ./backup.sh, ./uninstall.sh).
+# Pré-criando como o host, os containers só criam ARQUIVOS dentro de uma
+# pasta que já é do host — e um arquivo root dentro de uma pasta do host
+# ainda pode ser apagado/renomeado pelo dono da pasta.
+mkdir -p data/users media
+
 echo "==> Construindo as imagens..."
 docker compose build
 
@@ -58,6 +75,7 @@ fi
 echo "==> Baixando os modelos de IA local (pode demorar alguns minutos na primeira vez)..."
 docker compose exec -T ollama ollama pull "$TEXT_MODEL"
 docker compose exec -T ollama ollama pull "$VISION_MODEL"
+docker compose exec -T ollama ollama pull "$SEARCH_MODEL"
 
 echo "==> Subindo a api (Flask), o worker do Celery e o frontend (nginx)..."
 docker compose up -d api worker frontend
@@ -71,20 +89,23 @@ echo
 
 smoke_fail=0
 
-# 1. Ollama respondendo e com os dois modelos baixados. Output é capturado
+# 1. Ollama respondendo e com os três modelos baixados. Output é capturado
 # numa variável e comparado com 'case' (em vez de "| grep -q") de propósito:
 # com "set -o pipefail", "cmd | grep -q X" pode contar como falha mesmo
 # quando X é encontrado, porque o "-q" fecha o pipe assim que acha o
 # primeiro match e isso pode derrubar "cmd" com SIGPIPE antes dela terminar.
 ollama_list_output=$(docker compose exec -T ollama ollama list 2>/dev/null) || true
-ollama_ok_models=false
-case "$ollama_list_output" in
-    *"$TEXT_MODEL"*"$VISION_MODEL"*|*"$VISION_MODEL"*"$TEXT_MODEL"*) ollama_ok_models=true ;;
-esac
+ollama_ok_models=true
+for m in "$TEXT_MODEL" "$VISION_MODEL" "$SEARCH_MODEL"; do
+    case "$ollama_list_output" in
+        *"$m"*) ;;
+        *) ollama_ok_models=false ;;
+    esac
+done
 if [ "$ollama_ok_models" = true ]; then
-    echo "  [OK]     Ollama respondendo, com $TEXT_MODEL e $VISION_MODEL baixados"
+    echo "  [OK]     Ollama respondendo, com $TEXT_MODEL, $VISION_MODEL e $SEARCH_MODEL baixados"
 else
-    echo "  [FALHOU] Ollama não respondeu ou os modelos não foram baixados"
+    echo "  [FALHOU] Ollama não respondeu ou algum modelo não foi baixado"
     smoke_fail=1
 fi
 
@@ -143,6 +164,29 @@ esac
 rm -f /tmp/install_smoke_test.txt
 docker compose exec -T api rm -f /tmp/install_smoke_test.txt >/dev/null 2>&1 || true
 
+# 5. Log de processamento (SQLite, ver api/processing_log.py) — grava e lê
+# um evento de teste de dentro do container "api", confirmando que o
+# volume compartilhado com o "worker" (data/processing.db) é gravável e o
+# modo WAL funciona no filesystem real usado pelos containers.
+log_check=$(docker compose exec -T api python -c "
+import sqlite3
+from api import processing_log
+processing_log.log_event('smoke', 'install_smoke_test', 'task', 'done', 'install.sh')
+eventos = processing_log.list_events('smoke', entry_id='install_smoke_test')
+print('OK' if eventos else 'VAZIO')
+with sqlite3.connect(processing_log.DB_PATH) as conn:
+    conn.execute(\"DELETE FROM processing_events WHERE user_id = 'smoke'\")
+" 2>/dev/null) || true
+case "$log_check" in
+    *OK*)
+        echo "  [OK]     Log de processamento (SQLite, data/processing.db) gravando e lendo"
+        ;;
+    *)
+        echo "  [FALHOU] Não foi possível gravar/ler o log de processamento"
+        smoke_fail=1
+        ;;
+esac
+
 echo
 if [ "$smoke_fail" -ne 0 ]; then
     echo "Alguns smoke tests falharam — confira 'docker compose logs' antes de usar."
@@ -157,3 +201,4 @@ echo "  docker compose logs -f worker # só o worker (classificação de arquivo
 echo "  docker compose down           # parar tudo"
 echo "  ./install.sh                  # rodar de novo (idempotente)"
 echo "  ./uninstall.sh                # remover containers/imagens/volumes/cache"
+echo "  ./backup.sh --out ./backups/  # backup do log de processamento/.env/uploads pendentes"

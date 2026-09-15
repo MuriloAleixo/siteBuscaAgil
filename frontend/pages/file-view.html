@@ -37,10 +37,9 @@
         <i data-lucide="upload-cloud" class="nav-icon"></i>
         <span>Enviar Arquivo</span>
       </a>
-      <span class="nav-section-label">Sua Conta</span>
-      <a href="profile.html" class="nav-item">
-        <i data-lucide="user-circle" class="nav-icon"></i>
-        <span>Perfil / Drive</span>
+      <a href="processing.html" class="nav-item">
+        <i data-lucide="loader-2" class="nav-icon"></i>
+        <span>Histórico de Processamento</span>
       </a>
     </nav>
     <div class="sidebar-footer">
@@ -181,6 +180,9 @@
                   <div id="file-tags" class="flex flex-wrap gap-2"></div>
                   <p id="no-tags" class="text-xs hidden" style="color:var(--text-3)">Nenhuma tag cadastrada</p>
                 </div>
+                <button class="btn btn-outline btn-sm w-full mt-4" id="reprocess-btn" onclick="reprocessFile()">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> <span id="reprocess-btn-label">Reprocessar Classificação</span>
+                </button>
               </div>
 
               <!-- Edit mode -->

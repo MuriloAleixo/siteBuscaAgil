@@ -15,14 +15,26 @@ import os
 import requests
 
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_TIMEOUT", "120"))
+# 120s bastava pro qwen2.5:3b-instruct, mas o 7b-instruct (padrão desde a
+# troca por precisão) pode passar disso em CPU classificando transcrição
+# longa de vídeo/áudio — sem isso, um vídeo de poucos minutos já estourava
+# o timeout e caía pro Gemini, que não suporta vídeo/áudio (classificação
+# falhava nos dois lados). Roda em background no worker, então esperar mais
+# não trava nada pro usuário.
+OLLAMA_TIMEOUT = float(os.environ.get("OLLAMA_TIMEOUT", "300"))
 
 
 class OllamaError(RuntimeError):
     """Ollama indisponível, ou respondeu com erro."""
 
 
-def _generate(model: str, prompt: str, images: list[str] | None = None, json_format: bool = True) -> str:
+def _generate(
+    model: str,
+    prompt: str,
+    images: list[str] | None = None,
+    json_format: bool = True,
+    timeout: float | None = None,
+) -> str:
     payload = {"model": model, "prompt": prompt, "stream": False}
     if json_format:
         payload["format"] = "json"
@@ -30,7 +42,9 @@ def _generate(model: str, prompt: str, images: list[str] | None = None, json_for
         payload["images"] = images
 
     try:
-        resp = requests.post(f"{OLLAMA_BASE_URL}/api/generate", json=payload, timeout=OLLAMA_TIMEOUT)
+        resp = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate", json=payload, timeout=timeout if timeout is not None else OLLAMA_TIMEOUT
+        )
         resp.raise_for_status()
     except requests.RequestException as exc:
         raise OllamaError(f"Falha ao chamar o Ollama ({model}): {exc}") from exc
@@ -38,9 +52,17 @@ def _generate(model: str, prompt: str, images: list[str] | None = None, json_for
     return resp.json()["response"]
 
 
-def gerar_texto(model: str, prompt: str, json_format: bool = True) -> str:
-    """Chama o modelo de texto (ex.: LOCAL_AI_TEXT_MODEL) com um prompt puro."""
-    return _generate(model, prompt, json_format=json_format)
+def gerar_texto(model: str, prompt: str, json_format: bool = True, timeout: float | None = None) -> str:
+    """Chama o modelo de texto (ex.: LOCAL_AI_TEXT_MODEL) com um prompt puro.
+
+    timeout: sobrescreve o OLLAMA_TIMEOUT padrão (300s, calibrado pra
+    classificar documento/vídeo) — usado pela busca (ver
+    busca_analyzer_local.py), que dispara uma chamada a CADA consulta
+    digitada e precisa falhar rápido (cai pro Gemini/fuzzy local, ver
+    api/app.py::smart_search) em vez de travar a requisição por minutos se
+    o Ollama estiver ocupado com uma classificação em paralelo.
+    """
+    return _generate(model, prompt, json_format=json_format, timeout=timeout)
 
 
 def gerar_com_imagem(model: str, prompt: str, image_bytes: bytes, json_format: bool = False) -> str:

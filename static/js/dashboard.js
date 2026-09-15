@@ -12,8 +12,8 @@ let currentView = 'grid';
 let currentType = 'all';
 
 // Populate user details
-document.getElementById('header-avatar').src = user.avatar;
-document.getElementById('sidebar-avatar').src = user.avatar;
+setAvatar(document.getElementById('sidebar-avatar'), user);
+setAvatar(document.getElementById('header-avatar'), user);
 document.getElementById('sidebar-name').textContent = user.name;
 
 function renderStorageBar() {
@@ -146,11 +146,17 @@ function renderFileGridCard(file, query) {
   const typeInfo = getFileTypeInfo(file.type);
   const titleHtml = highlightQuery(file.name, query);
 
-  const preview = file.previewUrl
-    ? `<img src="${file.previewUrl}" alt="${file.name}" class="file-grid-preview" loading="lazy" />`
-    : `<div class="file-grid-icon-area" style="--icon-glow:${typeInfo.color}33">
+  // O link salvo pode ser o webViewLink do Drive (página HTML, não uma
+  // imagem de verdade) — o ícone fica pronto ao lado, escondido, e o
+  // onerror só revela ele se o <img> falhar ao carregar, em vez de deixar
+  // o card sem nada.
+  const iconFallback = `
+       <div class="file-grid-icon-area" style="--icon-glow:${typeInfo.color}33${file.previewUrl ? ';display:none' : ''}">
          <i data-lucide="${typeInfo.icon}" style="color:${typeInfo.color};width:38px;height:38px;position:relative;z-index:2"></i>
        </div>`;
+  const preview = file.previewUrl
+    ? `<img src="${file.previewUrl}" alt="${file.name}" class="file-grid-preview" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />${iconFallback}`
+    : iconFallback;
 
   const star = file.starred ? `<span class="file-star"><i data-lucide="star" style="width:16px;height:16px;fill:#fbbf24"></i></span>` : '';
   const confidenceBadge = isLowConfidence(file)
@@ -179,11 +185,13 @@ function renderResultCard(file, query) {
   const typeInfo = getFileTypeInfo(file.type);
   const titleHtml = highlightQuery(file.name, query);
 
-  const iconOrThumb = file.previewUrl
-    ? `<img src="${file.previewUrl}" alt="${file.name}" class="result-preview" />`
-    : `<div class="result-icon" style="background:${typeInfo.bg}">
+  const iconFallback = `
+       <div class="result-icon" style="background:${typeInfo.bg}${file.previewUrl ? ';display:none' : ''}">
          <i data-lucide="${typeInfo.icon}" style="color:${typeInfo.color};width:20px;height:20px"></i>
        </div>`;
+  const iconOrThumb = file.previewUrl
+    ? `<img src="${file.previewUrl}" alt="${file.name}" class="result-preview" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />${iconFallback}`
+    : iconFallback;
 
   return `
     <div class="result-card" onclick="openFile('${file.id}')">

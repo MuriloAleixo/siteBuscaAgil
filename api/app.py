@@ -23,14 +23,15 @@ import redis as redis_lib
 from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from api import google_drive, stores
+from api import google_drive, processing_log, stores
 from api.auth import auth_bp, current_user_id, login_required
 from api.csrf import init_csrf
 from api.text_match import FALLBACK_FUZZY_THRESHOLD, FUZZY_THRESHOLD, fuzzy_score, normalize
 from scripts.analisador_busca import BuscaAnalyzer
 from scripts.local_ai.busca_analyzer_local import LocalBuscaAnalyzer
 from scripts.local_ai.router import local_ai_habilitada
-from worker.tasks import classify_and_catalog_task, classify_link_task, sync_catalog_to_drive
+from worker.celery_app import app as celery_app
+from worker.tasks import classify_and_catalog_task, classify_link_task, reclassify_task, sync_catalog_to_drive
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ EXTENSION_TYPE_MAP = {
     ".mp4": "video", ".mov": "video", ".avi": "video", ".mkv": "video", ".webm": "video", ".wmv": "video",
     ".mp3": "audio", ".wav": "audio", ".ogg": "audio", ".m4a": "audio",
     ".xlsx": "sheet", ".xls": "sheet", ".csv": "sheet",
-    ".doc": "doc", ".docx": "doc", ".txt": "doc", ".py": "doc",
+    ".doc": "doc", ".docx": "doc", ".txt": "doc", ".py": "doc", ".pptx": "doc", ".ppt": "doc",
     ".zip": "archive", ".rar": "archive", ".tar": "archive", ".gz": "archive", ".7z": "archive",
 }
 
@@ -136,6 +137,7 @@ def create_app() -> Flask:
                 entry_status = "error"
                 task_id = None
 
+            now_iso = datetime.now(tz=timezone.utc).isoformat()
             stores.insert_entry(
                 user_id,
                 {
@@ -144,7 +146,14 @@ def create_app() -> Flask:
                     "type": _categorize_file(saved_name, content_type),
                     "content_type": content_type,
                     "size": os.path.getsize(saved_path),
-                    "created_at": datetime.now(tz=timezone.utc).isoformat(),
+                    "created_at": now_iso,
+                    # Quando a tentativa de processamento ATUAL começou —
+                    # igual a created_at na primeira vez, mas reprocess_file/
+                    # restart_file atualizam isso sozinhos, pra tela de
+                    # Histórico mostrar "há Xs/min" contado a partir da
+                    # tentativa em andamento, não do upload original (ver
+                    # static/js/processing.js::renderHistoryItem).
+                    "processing_started_at": now_iso,
                     "url": temp_public_url,
                     "status": entry_status,
                     "category": None,
@@ -201,13 +210,15 @@ def create_app() -> Flask:
             entry_status = "error"
             task_id = None
 
+        link_now_iso = datetime.now(tz=timezone.utc).isoformat()
         entry = {
             "id": entry_id,
             "name": name,
             "type": "link",
             "content_type": "text/url",
             "size": 0,
-            "created_at": datetime.now(tz=timezone.utc).isoformat(),
+            "created_at": link_now_iso,
+            "processing_started_at": link_now_iso,
             "url": url,
             "status": entry_status,
             "category": None,
@@ -257,6 +268,122 @@ def create_app() -> Flask:
 
         stores.write_all(user_id, registered_files)
         return jsonify({"success": True, "file": entry})
+
+    @app.post("/files/<file_id>/reprocess")
+    @login_required
+    def reprocess_file(file_id: str):
+        """Reclassifica um item já existente no catálogo sem reenviar o
+        arquivo do zero — baixa de novo do Drive (arquivo) ou usa a URL
+        direto (link), ver worker/tasks.py::_run_reclassification. Útil
+        quando a classificação original falhou por instabilidade passageira
+        da IA local/Gemini (ver GET /processing-log pro motivo)."""
+        user_id = current_user_id()
+        entry = stores.get_entry(user_id, file_id)
+        if entry is None:
+            return jsonify({"success": False, "error": "Arquivo não encontrado."}), 404
+
+        # Marca "processing" ANTES de enfileirar: se a tarefa rodar rápido
+        # (arquivo pequeno), o worker pode terminar e gravar "done" antes
+        # desta função continuar — fazendo nessa ordem, o pior caso é só
+        # gravar "processing" de novo em cima de um estado que já mudou,
+        # nunca o contrário (voltar "done"/"error" pra "processing" por cima
+        # do resultado real). processing_started_at reinicia a contagem de
+        # tempo mostrada na tela de Histórico (senão continuaria mostrando
+        # "há 3 dias" — o upload original — em vez de "há 2s", que é quando
+        # esta tentativa de fato começou).
+        stores.update_entry(
+            user_id, file_id, status="processing", processing_started_at=datetime.now(tz=timezone.utc).isoformat()
+        )
+        try:
+            async_result = reclassify_task.delay(user_id, file_id)
+        except Exception as exc:  # noqa: BLE001 - broker fora do ar não pode virar 500
+            logger.warning("Não foi possível enfileirar reprocessamento de '%s': %s", file_id, exc)
+            stores.update_entry(user_id, file_id, status="error")
+            return jsonify({"success": False, "error": "Fila de processamento indisponível no momento."}), 503
+
+        stores.update_entry(user_id, file_id, task_id=async_result.id)
+        return jsonify({"success": True, "id": file_id, "status": "processing", "task_id": async_result.id})
+
+    def _revoke_task(task_id: str | None) -> None:
+        """Mata a tarefa Celery em andamento (se houver). `terminate=True`
+        manda SIGTERM pro processo do worker que está executando ela —
+        único jeito de interromper de verdade uma classificação no meio
+        (é uma chamada síncrona/bloqueante pro Ollama/Gemini/ffmpeg, sem
+        checkpoint no meio pra "pausar e retomar"). Best-effort: o Celery só
+        manda o sinal pelo broker, não confirma na hora que o worker já
+        morreu — por isso `cancel_file`/`restart_file` também marcam o
+        catálogo direto, em vez de esperar o worker reagir sozinho."""
+        if not task_id:
+            return
+        try:
+            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+        except Exception as exc:  # noqa: BLE001 - best-effort
+            logger.warning("Não foi possível revogar a tarefa '%s': %s", task_id, exc)
+
+    @app.post("/files/<file_id>/cancel")
+    @login_required
+    def cancel_file(file_id: str):
+        """Cancela uma classificação em andamento. Ver _revoke_task sobre a
+        janela de corrida: se o worker terminar bem na hora em que o sinal
+        chega, o resultado dele pode sobrescrever este "error" logo depois
+        — raro, e sem jeito de evitar sem redesenhar o worker pra checar um
+        estado compartilhado a cada etapa."""
+        user_id = current_user_id()
+        entry = stores.get_entry(user_id, file_id)
+        if entry is None:
+            return jsonify({"success": False, "error": "Arquivo não encontrado."}), 404
+        if entry.get("status") != "processing":
+            return jsonify({"success": False, "error": "Este item não está em processamento."}), 409
+
+        task_id = entry.get("task_id")
+        _revoke_task(task_id)
+        stores.update_entry(user_id, file_id, status="error")
+        processing_log.log_event(user_id, file_id, "task", "error", "Cancelado pelo usuário", task_id=task_id)
+        return jsonify({"success": True, "id": file_id, "status": "error"})
+
+    @app.post("/files/<file_id>/restart")
+    @login_required
+    def restart_file(file_id: str):
+        """Reinicia a classificação de um item — cancela a tarefa atual (se
+        ainda estiver rodando) e dispara uma nova, escolhendo a tarefa certa
+        conforme o que já foi feito: link classifica direto pela URL; arquivo
+        já enviado ao Drive reclassifica sem reenviar (reclassify_task, como
+        POST /files/<id>/reprocess); arquivo cujo upload original nem
+        terminou ainda usa o arquivo local em media/ (só existe se o
+        cancelamento/erro aconteceu antes do upload confirmar)."""
+        user_id = current_user_id()
+        entry = stores.get_entry(user_id, file_id)
+        if entry is None:
+            return jsonify({"success": False, "error": "Arquivo não encontrado."}), 404
+
+        _revoke_task(entry.get("task_id"))
+        # processing_started_at reinicia a contagem de tempo na tela de
+        # Histórico — mesmo motivo do reprocess_file acima.
+        stores.update_entry(
+            user_id, file_id, status="processing", processing_started_at=datetime.now(tz=timezone.utc).isoformat()
+        )
+
+        try:
+            if entry.get("type") == "link":
+                async_result = classify_link_task.delay(user_id, file_id, entry["url"])
+            elif entry.get("drive_file_id"):
+                async_result = reclassify_task.delay(user_id, file_id)
+            else:
+                saved_path = MEDIA_ROOT / file_id
+                if not saved_path.exists():
+                    stores.update_entry(user_id, file_id, status="error")
+                    return jsonify({
+                        "success": False,
+                        "error": "O arquivo original não está mais disponível pra reiniciar — envie de novo.",
+                    }), 409
+                async_result = classify_and_catalog_task.delay(user_id, file_id, str(saved_path), entry["name"])
+        except Exception as exc:  # noqa: BLE001 - broker fora do ar não pode virar 500
+            logger.warning("Não foi possível reiniciar o processamento de '%s': %s", file_id, exc)
+            stores.update_entry(user_id, file_id, status="error")
+            return jsonify({"success": False, "error": "Fila de processamento indisponível no momento."}), 503
+
+        stores.update_entry(user_id, file_id, task_id=async_result.id)
+        return jsonify({"success": True, "id": file_id, "status": "processing", "task_id": async_result.id})
 
     @app.get("/files")
     @login_required
@@ -489,6 +616,20 @@ def create_app() -> Flask:
             pending_in_broker = None
 
         return jsonify({"success": True, "counts": counts, "pending_in_broker": pending_in_broker})
+
+    @app.get("/processing-log")
+    @login_required
+    def processing_log_view():
+        """Histórico de eventos de processamento (ver api/processing_log.py)
+        — o que cada tarefa fez e o motivo real de cada erro, em vez do
+        genérico status="error" que o catálogo guarda. Passe `?file_id=` pra
+        pegar só a linha do tempo de um arquivo/link específico."""
+        user_id = current_user_id()
+        entry_id = request.args.get("file_id") or None
+        events = processing_log.list_events(user_id, entry_id=entry_id)
+        response = jsonify({"success": True, "events": events})
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
     return app
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fila de Processamento — BuscaÁgil</title>
+  <title>Histórico de Processamento — BuscaÁgil</title>
   <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg" />
   <link rel="stylesheet" href="/static/css/styles.css" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -12,9 +12,9 @@
   </script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
-<body class="grid-bg google-search-page">
+<body class="grid-bg">
 
-<div class="dashboard-layout google-search-layout">
+<div class="dashboard-layout">
 
   <!-- ── SIDEBAR ── -->
   <aside class="sidebar" id="sidebar">
@@ -39,14 +39,9 @@
       </a>
       <a href="processing.html" class="nav-item active">
         <i data-lucide="loader-2" class="nav-icon"></i>
-        <span>Fila de Processamento</span>
+        <span>Histórico de Processamento</span>
       </a>
 
-      <span class="nav-section-label">Sua Conta</span>
-      <a href="profile.html" class="nav-item">
-        <i data-lucide="user-circle" class="nav-icon"></i>
-        <span>Perfil / Drive</span>
-      </a>
     </nav>
 
     <div class="sidebar-footer">
@@ -68,22 +63,19 @@
   <div class="main-content">
 
     <!-- Header -->
-    <header class="top-header google-search-header">
+    <header class="top-header">
       <button class="btn btn-ghost btn-icon lg:hidden" id="sidebar-toggle">
         <i data-lucide="menu" class="w-5 h-5"></i>
       </button>
-      <a href="dashboard.html" class="google-search-logo">
-        <span class="google-search-logo__mark"><i data-lucide="search" class="w-4 h-4"></i></span>
-        <span class="logo-text">Busca<span class="gradient-text">Ágil</span></span>
-      </a>
-      <div class="flex items-center gap-2 ml-auto">
-        <a href="upload.html" class="google-search-upload" title="Enviar arquivo">
-          <i data-lucide="plus" class="w-4 h-4"></i><span class="hidden sm:inline">Enviar</span>
-        </a>
-        <a href="profile.html">
-          <img id="header-avatar" src="" alt="Avatar" class="avatar avatar-sm hover:ring-2" style="--tw-ring-color:var(--violet)" />
-        </a>
+      <div class="flex-1">
+        <h2 class="text-sm font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Histórico de Processamento</h2>
       </div>
+      <a href="upload.html" class="btn btn-ghost btn-sm" style="color:var(--text-2)">
+        <i data-lucide="upload-cloud" class="w-4 h-4"></i> Enviar Arquivo
+      </a>
+      <a href="profile.html" title="Perfil / Drive">
+        <img id="header-avatar" src="" alt="Avatar" class="avatar avatar-sm" />
+      </a>
     </header>
 
     <!-- Page Body -->
@@ -93,8 +85,8 @@
       <section class="google-search-hero">
         <div>
           <p class="google-search-eyebrow">ACOMPANHAMENTO</p>
-          <h1>Fila de <span>Processamento</span></h1>
-          <p class="google-search-description">Veja em tempo real o que ainda está sendo classificado pela IA — a lista atualiza sozinha, não precisa recarregar a página.</p>
+          <h1>Histórico de <span>Processamento</span></h1>
+          <p class="google-search-description">Acompanhe o que está sendo classificado pela IA agora e reveja o que já foi — filtre por status e abra qualquer item pra ver o que aconteceu passo a passo. Atualiza sozinho, não precisa recarregar a página.</p>
         </div>
       </section>
 
@@ -118,16 +110,23 @@
         </div>
       </div>
 
-      <!-- Processing List -->
-      <div id="processing-list" class="flex flex-col gap-3"></div>
+      <!-- Histórico de Processamento — um item por arquivo/link (status vem
+           de GET /files), filtrável por status. Persistente: diferente da
+           fila antiga, nada some sozinho da lista. Cada item pode ser
+           expandido pra ver a linha do tempo detalhada (GET /processing-log,
+           ver api/processing_log.py) — o motivo real de um erro, por
+           exemplo, em vez de só "com erro". -->
+      <div class="flex gap-2 mb-6 overflow-x-auto pb-1" id="history-filters"></div>
+
+      <div id="history-list" class="flex flex-col gap-3"></div>
 
       <!-- Empty State -->
-      <div id="processing-empty" class="empty-state hidden">
+      <div id="history-empty" class="empty-state hidden">
         <div class="empty-icon">
           <i data-lucide="check-circle-2" class="w-10 h-10"></i>
         </div>
-        <h3 class="text-lg font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Nada em processamento no momento</h3>
-        <p style="color:var(--text-2);font-size:14px">Os arquivos que você enviar aparecem aqui enquanto a IA classifica.</p>
+        <h3 id="history-empty-title" class="text-lg font-bold text-white" style="font-family:'Space Grotesk',sans-serif">Nada por aqui ainda</h3>
+        <p id="history-empty-text" style="color:var(--text-2);font-size:14px">Os arquivos que você enviar aparecem aqui.</p>
         <a href="upload.html" class="btn btn-outline btn-sm mt-2">
           <i data-lucide="upload-cloud" class="w-4 h-4"></i> Enviar Arquivo
         </a>
@@ -147,10 +146,7 @@
       <i data-lucide="upload-cloud"></i><span>Enviar</span>
     </a>
     <a href="processing.html" class="mobile-nav-item active">
-      <i data-lucide="loader-2"></i><span>Fila</span>
-    </a>
-    <a href="profile.html" class="mobile-nav-item">
-      <i data-lucide="user-circle"></i><span>Perfil</span>
+      <i data-lucide="loader-2"></i><span>Histórico</span>
     </a>
   </div>
 </nav>

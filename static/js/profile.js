@@ -8,10 +8,11 @@ if (!requireAuth()) throw new Error('Not authenticated');
 const user = getCurrentUser();
 
 // Populate
-if (document.getElementById('sidebar-avatar')) document.getElementById('sidebar-avatar').src = user.avatar;
+setAvatar(document.getElementById('sidebar-avatar'), user);
+setAvatar(document.getElementById('header-avatar'), user);
 if (document.getElementById('sidebar-name')) document.getElementById('sidebar-name').textContent = user.name;
 
-if (document.getElementById('profile-avatar')) document.getElementById('profile-avatar').src = user.avatar;
+setAvatar(document.getElementById('profile-avatar'), user);
 if (document.getElementById('profile-name')) document.getElementById('profile-name').textContent = user.name;
 if (document.getElementById('profile-email')) document.getElementById('profile-email').textContent = user.email;
 if (document.getElementById('profile-plan')) document.getElementById('profile-plan').textContent = user.plan + ' Plan';

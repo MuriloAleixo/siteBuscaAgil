@@ -82,17 +82,35 @@ Clique em **"Ver Processamento"** pra acompanhar ao vivo, **"Ir para a
 Busca"** quando terminar, ou
 **"Enviar mais"** pra continuar enviando.
 
-## Fila De Processamento
+## Histórico De Processamento
 
-Tela dedicada (ícone **"Fila"** no cabeçalho do painel principal, ao lado
-de "Enviar" — ou o botão **"Ver Processamento"** depois de um upload) pra
-acompanhar ao vivo tudo
-que ainda está sendo classificado pela IA — sem precisar recarregar a
-página. Cada item mostra um ícone girando com **"Classificando..."**
-enquanto está em andamento; quando termina, mostra rapidamente o resultado
-(a categoria encontrada, ou um aviso de erro) antes de sair da lista. Se
-não houver nada em processamento, a tela mostra uma mensagem avisando que
-está tudo em dia.
+Tela dedicada (ícone **"Histórico"** no cabeçalho do painel principal, ao
+lado de "Enviar" — ou o botão **"Ver Processamento"** depois de um upload)
+com todos os arquivos e links que já passaram pela classificação da IA,
+sem precisar recarregar a página. Diferente de uma fila comum, os itens
+não somem daqui depois de terminar — fica um histórico permanente.
+
+No topo, quatro filtros mostram quantos itens tem em cada situação:
+**Todos**, **Ativos** (classificando agora), **Concluídos** e **Com erro**.
+Clique num filtro pra ver só aquele grupo.
+
+Cada item mostra o resultado atual — um ícone girando com
+**"Classificando..."** enquanto está em andamento, a categoria encontrada
+quando termina, ou um aviso de erro. Clique na setinha do lado direito de
+qualquer item pra expandir a **linha do tempo** dele: cada etapa que rodou
+(classificação, envio ao Drive, sincronização do catálogo), quando
+aconteceu e, se algo deu errado, o motivo real do erro (ex.: "Ollama
+indisponível", timeout na transcrição de um vídeo) — em vez de só um aviso
+genérico de falha. Útil pra conferir o que aconteceu com um envio
+específico, principalmente arquivos grandes/vídeos, que demoram mais.
+
+Itens **ativos** (ainda classificando) têm dois botões extras:
+- **Reiniciar** — para o que estava rodando e começa de novo do zero.
+  Útil se está demorando demais ou você desconfia que travou.
+- **Cancelar** — interrompe de vez (pede confirmação); o item vira "com
+  erro". Não existe "pausar e continuar depois" — a classificação não tem
+  como ser retomada de onde parou, só recomeçada inteira (Reiniciar) ou
+  interrompida (Cancelar).
 
 ## Ver Detalhes De Um Arquivo
 
@@ -112,7 +130,11 @@ página de detalhes. Nela você encontra:
   Clique em **"Salvar"** pra confirmar. Quando a IA classificou o arquivo
   mas ficou pouco confiante do resultado, aparece um selo laranja avisando
   pra revisar a categoria/tags — some assim que você confirma ou corrige
-  manualmente.
+  manualmente. O botão **"Reprocessar Classificação"**, logo abaixo das
+  tags, manda a IA tentar de novo sem precisar reenviar o arquivo — útil
+  quando a classificação falhou por uma instabilidade passageira (confira o
+  motivo no Histórico de Processamento). Pode levar alguns minutos,
+  principalmente em vídeos.
 - **Ações**: **"Abrir no Google Drive"**, **"Baixar Arquivo"** (baixa o
   conteúdo real, não só o link), **"Copiar Link"** (copia o link desta
   página de detalhes), e **"Remover do Drive"**.
@@ -144,7 +166,9 @@ dados de conta Google, um resumo de quantos arquivos você tem por tipo
 casos: o formato pode não ser suportado pela classificação automática, ou a
 IA (local e/ou Gemini) pode estar indisponível no momento. O arquivo
 continua salvo no seu Drive normalmente — você pode classificar
-manualmente na página de detalhes.
+manualmente na página de detalhes. Pra ver o motivo exato, expanda o item
+no **Histórico de Processamento** (acima) — ele mostra a etapa que falhou
+e o erro real.
 
 **A busca não encontrou um arquivo que eu sei que enviei.** Tente buscar só
 por parte do nome, ou pelo assunto/categoria em vez do nome exato — a busca

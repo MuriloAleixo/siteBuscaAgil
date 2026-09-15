@@ -7,9 +7,9 @@ lucide.createIcons();
 if (!requireAuth()) throw new Error('Not authenticated');
 
 const user = getCurrentUser();
-document.getElementById('sidebar-avatar').src = user.avatar;
+setAvatar(document.getElementById('sidebar-avatar'), user);
 document.getElementById('sidebar-name').textContent = user.name;
-document.getElementById('header-avatar').src = user.avatar;
+setAvatar(document.getElementById('header-avatar'), user);
 
 let currentFilter = 'all';
 
@@ -115,11 +115,16 @@ function renderSearchCard(file, query) {
   const typeInfo = getFileTypeInfo(file.type);
   const titleHtml = highlightQuery(file.name, query);
 
-  const iconOrThumb = file.previewUrl
-    ? `<img src="${file.previewUrl}" alt="${file.name}" class="result-preview" />`
-    : `<div class="result-icon" style="background:${typeInfo.bg}">
+  // Fallback pro ícone se o previewUrl não for uma imagem de verdade (ex.:
+  // webViewLink do Drive, que é uma página HTML) — mesmo padrão de
+  // dashboard.js::renderFileGridCard.
+  const iconFallback = `
+       <div class="result-icon" style="background:${typeInfo.bg}${file.previewUrl ? ';display:none' : ''}">
          <i data-lucide="${typeInfo.icon}" style="color:${typeInfo.color};width:22px;height:22px"></i>
        </div>`;
+  const iconOrThumb = file.previewUrl
+    ? `<img src="${file.previewUrl}" alt="${file.name}" class="result-preview" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />${iconFallback}`
+    : iconFallback;
 
   return `
     <div class="result-card" onclick="window.location.href='file-view.html?id=${file.id}'">

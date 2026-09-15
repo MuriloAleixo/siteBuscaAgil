@@ -6,9 +6,9 @@ lucide.createIcons();
 if (!requireAuth()) throw new Error('Not authenticated');
 
 const user = getCurrentUser();
-if (document.getElementById('sidebar-avatar')) document.getElementById('sidebar-avatar').src = user.avatar;
+setAvatar(document.getElementById('sidebar-avatar'), user);
 if (document.getElementById('sidebar-name')) document.getElementById('sidebar-name').textContent = user.name;
-if (document.getElementById('header-avatar')) document.getElementById('header-avatar').src = user.avatar;
+setAvatar(document.getElementById('header-avatar'), user);
 
 // Sidebar toggle
 const sbToggle = document.getElementById('sidebar-toggle');
@@ -85,7 +85,10 @@ function renderPreview(file, typeInfo) {
   const area = document.getElementById('preview-area');
 
   if (file.type === 'image' && file.previewUrl) {
-    area.innerHTML = `<img src="${file.previewUrl}" alt="${file.name}" style="width:100%;max-height:520px;object-fit:contain;" />`;
+    // previewUrl pode ser o webViewLink do Drive (página HTML, não uma
+    // imagem de verdade) — se o <img> falhar, cai pro ícone em vez de
+    // ficar quebrado/vazio.
+    area.innerHTML = `<img src="${file.previewUrl}" alt="${file.name}" style="width:100%;max-height:520px;object-fit:contain;" onerror="onImagePreviewError('${typeInfo.icon}','${typeInfo.color}','${typeInfo.bg}')" />`;
   } else if (file.type === 'video') {
     if (file.previewUrl) {
       area.innerHTML = `
@@ -129,6 +132,12 @@ function renderPreview(file, typeInfo) {
   } else {
     area.innerHTML = renderIconPreview(typeInfo, `Abra no Google Drive para visualizar o arquivo completo`);
   }
+}
+
+function onImagePreviewError(icon, color, bg) {
+  document.getElementById('preview-area').innerHTML =
+    renderIconPreview({ icon, color, bg }, 'Abra no Google Drive para visualizar a imagem');
+  lucide.createIcons();
 }
 
 function renderIconPreview(typeInfo, subtitle) {
@@ -262,6 +271,93 @@ async function saveClassification() {
     showToast(e.message || 'Erro ao salvar a classificação.', 'error');
   }
   btn.disabled = false;
+}
+
+// Reprocessar: reclassifica um item já existente (baixa de novo do Drive se
+// for arquivo, sem duplicar upload — ver worker/tasks.py::_run_reclassification)
+// sem precisar reenviar do zero. Útil quando a classificação original falhou
+// por instabilidade passageira da IA (ver Histórico de Processamento em
+// processing.html pro motivo exato).
+function pollReprocessStatus(fileId, { intervalMs = 2000, timeoutMs = 360000 } = {}) {
+  const startedAt = Date.now();
+  const tick = async () => {
+    try {
+      const res = await fetch(`${UPLOADED_FILES_API_URL}/${encodeURIComponent(fileId)}/status`, { cache: 'no-store' });
+      const data = await res.json();
+      if (res.ok && data.success && (data.status === 'done' || data.status === 'error')) {
+        onReprocessFinished(data);
+        return;
+      }
+    } catch (e) {
+      // rede instável durante o polling: só tenta de novo no próximo tick
+    }
+    if (Date.now() - startedAt < timeoutMs) {
+      setTimeout(tick, intervalMs);
+    } else {
+      onReprocessFinished(null); // timeout — some caso raro (vídeo bem longo)
+    }
+  };
+  setTimeout(tick, intervalMs);
+}
+
+function setReprocessBtnBusy(busy) {
+  const btn = document.getElementById('reprocess-btn');
+  const label = document.getElementById('reprocess-btn-label');
+  btn.disabled = busy;
+  label.textContent = busy ? 'Reprocessando…' : 'Reprocessar Classificação';
+  // lucide.createIcons() já trocou o <i data-lucide> original por um <svg> —
+  // procura os dois pra funcionar tanto antes quanto depois da conversão.
+  btn.querySelector('svg, i')?.classList.toggle('spin', busy);
+}
+
+async function reprocessFile() {
+  if (!currentFile) return;
+  setReprocessBtnBusy(true);
+  try {
+    const res = await fetch(`${UPLOADED_FILES_API_URL}/${encodeURIComponent(currentFile.id)}/reprocess`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getCsrfToken() },
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || `Falha ao reprocessar (${res.status}).`);
+    }
+    showToast('Reprocessando classificação — pode levar alguns minutos (vídeos demoram mais).', 'info');
+    pollReprocessStatus(currentFile.id);
+  } catch (e) {
+    showToast(e.message || 'Erro ao reprocessar.', 'error');
+    setReprocessBtnBusy(false);
+  }
+}
+
+function onReprocessFinished(statusData) {
+  setReprocessBtnBusy(false);
+  if (!statusData) {
+    showToast('Reprocessamento está demorando mais que o esperado — confira o Histórico de Processamento.', 'info');
+    return;
+  }
+  if (statusData.status === 'error') {
+    showToast('Não foi possível reclassificar — confira o Histórico de Processamento pra ver o motivo.', 'error');
+    return;
+  }
+
+  currentFile.category = statusData.category || null;
+  currentFile.tags = statusData.tags || [];
+  currentFile.description = statusData.description || '';
+  currentFile.classificationSource = 'ai';
+
+  const idx = MOCK_FILES.findIndex((x) => x.id === currentFile.id);
+  if (idx !== -1) {
+    MOCK_FILES[idx].category = currentFile.category;
+    MOCK_FILES[idx].tags = currentFile.tags;
+    MOCK_FILES[idx].description = currentFile.description;
+    MOCK_FILES[idx].classificationSource = currentFile.classificationSource;
+  }
+
+  renderClassification(currentFile);
+  renderDescription(currentFile);
+  lucide.createIcons();
+  showToast(`Reclassificado: ${currentFile.category || 'sem categoria encontrada'}.`, 'success');
 }
 
 // Star toggle

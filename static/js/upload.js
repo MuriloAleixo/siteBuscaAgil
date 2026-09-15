@@ -6,7 +6,8 @@ lucide.createIcons();
 if (!requireAuth()) throw new Error('Not authenticated');
 
 const user = getCurrentUser();
-document.getElementById('sidebar-avatar').src = user.avatar;
+setAvatar(document.getElementById('sidebar-avatar'), user);
+setAvatar(document.getElementById('header-avatar'), user);
 document.getElementById('sidebar-name').textContent = user.name;
 const UPLOAD_API_URL = window.BUSCA_AGIL_UPLOAD_URL || (window.location.protocol === 'file:' ? 'http://localhost/upload' : '/upload');
 const ADD_LINK_API_URL = window.BUSCA_AGIL_ADD_LINK_URL || (window.location.protocol === 'file:' ? 'http://localhost/add-link' : '/add-link');
@@ -186,6 +187,19 @@ function uploadFileToMedia(file, onProgress) {
   });
 }
 
+// Tela final de "concluído" — compartilhada entre upload de arquivo e
+// cadastro de link, pra dar a mesma experiência nos dois casos em vez de
+// um só mostrar um toast e o outro trocar de tela.
+function showDoneScreen(text) {
+  document.getElementById('state-done-text').textContent = text;
+  document.getElementById('drop-zone').classList.add('hidden');
+  document.getElementById('add-link-box').classList.add('hidden');
+  document.getElementById('file-queue').classList.add('hidden');
+  document.getElementById('upload-actions').classList.add('hidden');
+  document.getElementById('state-done').classList.remove('hidden');
+  lucide.createIcons();
+}
+
 // ── Start Uploads ──
 async function startUploads() {
   const pending = fileQueue.filter((q) => q.status === 'pending');
@@ -254,11 +268,7 @@ async function startUploads() {
 
   if (allDone && anySuccess) {
     setTimeout(() => {
-      document.getElementById('file-queue').classList.add('hidden');
-      document.getElementById('upload-actions').classList.add('hidden');
-      document.getElementById('state-done').classList.remove('hidden');
-      document.getElementById('drop-zone').classList.add('hidden');
-      lucide.createIcons();
+      showDoneScreen('Seus arquivos já foram enviados para o seu Google Drive.');
     }, 600);
   }
 }
@@ -267,6 +277,7 @@ function resetUpload() {
   fileQueue = [];
   document.getElementById('file-queue').classList.remove('hidden');
   document.getElementById('drop-zone').classList.remove('hidden');
+  document.getElementById('add-link-box').classList.remove('hidden');
   document.getElementById('state-done').classList.add('hidden');
   renderQueue();
 }
@@ -324,6 +335,16 @@ async function addLink() {
 
     input.value = '';
     showToast(`Link "${f.name}" cadastrado com sucesso.`, 'success');
+
+    // Mesma tela de conclusão do upload de arquivo — só não troca de tela
+    // se ainda houver arquivo pendente/enviando na fila (senão o link
+    // "engoliria" o progresso do que ainda está em andamento).
+    const semArquivoEmAndamento = !fileQueue.some((q) => q.status === 'pending' || q.status === 'uploading');
+    if (semArquivoEmAndamento) {
+      setTimeout(() => {
+        showDoneScreen(`Seu link "${f.name}" foi cadastrado e já está sendo classificado.`);
+      }, 400);
+    }
   } catch (e) {
     showToast(e.message || 'Erro ao cadastrar o link. Tente novamente.', 'error');
   }

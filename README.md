@@ -13,7 +13,9 @@ de dados), veja **[ARQUITETURA.md](ARQUITETURA.md)**.
 
 ## Estrutura Do Projeto
 
-Sem framework "cheio" nem banco de dados — cinco peças simples:
+Sem framework "cheio" nem banco de dados pros dados de negócio — cinco
+peças simples (a única exceção é um SQLite pequeno só pro log de
+processamento, ver `processing_log.py` abaixo):
 
 - `frontend/` — nginx: serve o HTML/CSS/JS estático e faz proxy das rotas de dados pra `api/`
 - `api/` — Flask: login com Google, upload, busca, status da fila
@@ -21,7 +23,7 @@ Sem framework "cheio" nem banco de dados — cinco peças simples:
 - `scripts/` — orquestração de IA (local via Ollama e/ou Gemini), sem dependência de framework
 - `static/` — CSS/JS compartilhado entre as páginas em `frontend/pages/`
 - pouso temporário de upload em `media/` (arquivo some de lá assim que o worker confirma o envio pro Drive)
-- cache local (catálogo + tokens OAuth) por usuário em `data/users/<id>/`
+- cache local (catálogo + tokens OAuth) por usuário em `data/users/<id>/`, e o log de processamento em `data/processing.db`
 
 Dentro de `api/`, vale destacar:
 
@@ -30,6 +32,7 @@ Dentro de `api/`, vale destacar:
 - `csrf.py` — proteção CSRF (double-submit cookie)
 - `google_drive.py` — toda a integração com a Drive API (pasta do usuário, catálogo, upload/download/exclusão de arquivos)
 - `stores.py` — leitura/escrita do cache local por usuário (catálogo + perfil), com lock de arquivo — não tem banco de dados nenhum, é tudo JSON em disco
+- `processing_log.py` — histórico de eventos de cada classificação (SQLite, `data/processing.db`) — o que cada etapa fez e o motivo real de cada erro, consultado por `GET /processing-log` e mostrado na tela de Histórico de Processamento
 - `text_match.py` — critério único de busca (normalização de acento + fuzzy matching via `rapidfuzz`), usado tanto pelo filtro no backend quanto (portado em JS) pelo fallback local do frontend
 
 Dentro de `worker/`:
@@ -105,10 +108,10 @@ script, sem precisar instalar Python/venv/Redis/ffmpeg no seu WSL.
 O script builda as imagens, sobe o Ollama, baixa os modelos de IA local,
 sobe a api, o worker e o frontend e, ao final, roda uma bateria de
 **smoke tests** (Ollama respondendo com os modelos certos, frontend
-respondendo em `:80`, worker do Celery respondendo a um ping via broker, e
-uma classificação de arquivo de ponta a ponta) — se algum teste crítico
-falhar, o script para e mostra o que verificar. Se tudo passar, acesse
-`http://localhost/`.
+respondendo em `:80`, worker do Celery respondendo a um ping via broker,
+uma classificação de arquivo de ponta a ponta, e o log de processamento
+gravando/lendo em SQLite) — se algum teste crítico falhar, o script para e
+mostra o que verificar. Se tudo passar, acesse `http://localhost/`.
 
 Comandos do dia a dia depois da primeira vez:
 
@@ -127,11 +130,36 @@ configuração/instrução, pronto pra rodar `./install.sh` de novo do zero:
 ```
 
 O script pergunta antes de cada passo destrutivo, inclusive se quer apagar
-o `.env` (suas chaves do Gemini/Google) ou mantê-lo.
+o `.env` (suas chaves do Gemini/Google) ou mantê-lo. **Antes de rodar**,
+considere fazer um backup (seção abaixo) — `uninstall.sh` já avisa e pede
+confirmação, mas o log de processamento não tem cópia em lugar nenhum.
 
 Se preferir configurar cada peça manualmente (sem Docker) — útil pra
 depurar direto —, veja [Rodar Manualmente (Sem Docker)](#6-rodar-manualmente-sem-docker)
 mais abaixo. As seções **3**, **4** e **5** valem pros dois jeitos de rodar.
+
+### Backup E Restauração
+
+`./backup.sh` guarda (e restaura) o que é **estado local sem cópia em
+nenhum outro lugar**: o log de processamento (`data/processing.db`),
+uploads temporários que ainda não confirmaram no Drive (`media/`) e o
+`.env`. Depois de um `./install.sh` do zero numa máquina nova, restaurar um
+backup deixa o sistema no ponto em que o backup foi feito — só falta logar
+com Google de novo (o cache de catálogo/tokens em `data/users/` fica de
+fora de propósito: é só um espelho do que já está no Drive, o próprio login
+recria tudo sozinho, então não compensa carregar tokens OAuth extras dentro
+do arquivo de backup).
+
+```bash
+./backup.sh --out ./backups/          # cria o backup (nome com timestamp)
+./backup.sh --in ./backups/buscaagil-backup-20260101-120000.tar.gz
+```
+
+`--in` pede confirmação antes de sobrescrever (pula com `--yes`) e move o
+estado atual pra `*.before-restore-<timestamp>` ao lado, em vez de apagar —
+dá pra recuperar na mão se restaurar o backup errado. O arquivo gerado
+contém o `.env` e tokens OAuth em texto puro — trate-o como um segredo (o
+`.gitignore` já evita commitar `buscaagil-backup-*.tar.gz` por engano).
 
 ### 3. Configurar Variáveis De Ambiente
 
@@ -236,16 +264,23 @@ docker compose up -d ollama
 ```bash
 docker compose exec ollama ollama pull qwen2.5:7b-instruct
 docker compose exec ollama ollama pull moondream
+docker compose exec ollama ollama pull qwen2.5:3b-instruct
 ```
 
-- `qwen2.5:7b-instruct`: classifica texto/documentos e interpreta a busca
-  (mesmo papel que o Gemini faz hoje). Mais preciso que o `3b`, ao custo de
-  rodar mais devagar em CPU — se a máquina não aguentar, troque
+- `qwen2.5:7b-instruct`: classifica texto/documentos (mesmo papel que o
+  Gemini faz hoje). Mais preciso que o `3b`, ao custo de rodar mais devagar
+  em CPU — se a máquina não aguentar, troque
   `LOCAL_AI_TEXT_MODEL=qwen2.5:3b-instruct` no `.env` e baixe esse modelo
   em vez do `7b`.
 - `moondream`: modelo de visão leve (~1.8B, roda bem em CPU) — descreve
   imagens e frames de vídeo/páginas de PDF escaneado em texto, que depois é
   classificado pelo modelo de texto acima.
+- `qwen2.5:3b-instruct` (`LOCAL_AI_SEARCH_MODEL`): interpreta a busca —
+  modelo **separado** do de classificação de propósito, porque busca
+  dispara uma chamada a CADA consulta digitada (não uma vez por arquivo) e
+  precisa responder rápido, com timeout curto (`LOCAL_AI_SEARCH_TIMEOUT`,
+  10s por padrão) pra cair pro Gemini/fuzzy local em vez de travar a tela
+  se o Ollama estiver ocupado classificando algo em paralelo.
 - Transcrição de áudio/vídeo (`faster-whisper`) não é modelo do Ollama —
   baixa sozinha na primeira vez que for usada, tamanho controlado por
   `LOCAL_AI_WHISPER_MODEL` no `.env` (padrão `small`; `tiny` é mais rápido
@@ -261,6 +296,17 @@ sudo apt-get install -y ffmpeg
 
 Sem isso, arquivos de vídeo/áudio continuam funcionando (upload normal pro
 Drive), só não ficam com categoria/tags/descrição.
+
+**Limite de CPU/RAM dos containers** — classificar vídeo localmente (whisper
++ moondream + qwen, tudo em CPU) é pesado; sem limite, os containers
+`ollama`/`worker` podem consumir todos os núcleos/RAM do host e travar a
+máquina (WSL2 não limita sozinho). O `docker-compose.yml` já vem com um teto
+(`OLLAMA_CPUS`/`OLLAMA_MEM_LIMIT`/`WORKER_CPUS`/`WORKER_MEM_LIMIT` no
+`.env.example`) — ajuste pra baixo se sua máquina tiver poucos núcleos ou
+pouca RAM livre, ou pra cima se sobrar recurso e quiser mais velocidade. Pelo
+mesmo motivo, o worker roda com `--concurrency=1` por padrão (uma
+classificação pesada por vez, em vez de uma por núcleo) — ajustável via
+`CELERY_WORKER_CONCURRENCY` no `.env` (ver `worker/entrypoint.sh`).
 
 **Como funciona o roteamento** — cada arquivo enviado é roteado
 automaticamente pro tratamento certo, pela extensão:

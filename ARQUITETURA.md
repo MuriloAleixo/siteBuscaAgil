@@ -10,13 +10,17 @@ Pra instalar/rodar veja o [README.md](README.md); pra usar o sistema veja o
 dentro funciona.
 
 **Stack**: Flask · Celery 5.4 · Redis · Docker Compose · nginx · Ollama (IA
-local) · Gemini API · Google Drive API (OAuth2 manual) · rapidfuzz
+local) · Gemini API · Google Drive API (OAuth2 manual) · rapidfuzz · SQLite
+(log de processamento)
 
-Projeto propositalmente simples — sem ORM, sem banco de dados, sem build
-step no frontend. A ideia é deixar visíveis os conceitos de sistemas
-distribuídos que ele usa de verdade: fila de mensagens, broker, worker,
-gateway/reverse proxy — sem framework "corporativo" no meio pra esconder
-onde cada peça começa e termina.
+Projeto propositalmente simples — sem ORM, sem banco de dados pros dados de
+negócio, sem build step no frontend. A ideia é deixar visíveis os conceitos
+de sistemas distribuídos que ele usa de verdade: fila de mensagens, broker,
+worker, gateway/reverse proxy — sem framework "corporativo" no meio pra
+esconder onde cada peça começa e termina. A única exceção é um SQLite
+pequeno, só pro log de eventos de processamento (ver
+[seção 5](#5-sem-banco-de-dados-tudo-em-json)) — não muda a ideia central,
+o catálogo/perfil continuam JSON puro.
 
 ## Sumário
 
@@ -54,6 +58,7 @@ buscar por assunto, não só por nome de arquivo.
 | Google Drive | Arquivo real + `uploaded_files.json` | Fonte da verdade, dono é o usuário |
 | `data/users/<id>/catalog.json` | Cópia do catálogo | Cache local — responde rápido sem bater no Drive a cada tela |
 | `data/users/<id>/profile.json` | Tokens OAuth + IDs do Drive + cota | Só o que é infraestrutura da própria sessão do usuário |
+| `data/processing.db` | Log de eventos de processamento (SQLite) | Histórico que cresce por append — não é espelho de nada no Drive, é só operacional (ver [seção 5](#5-sem-banco-de-dados-tudo-em-json)) |
 | `media/` | Arquivo enviado, por segundos | Pouso temporário até subir pro Drive |
 
 ---
@@ -73,9 +78,9 @@ flowchart LR
         Api["api\nFlask\napp.py · auth.py · google_drive.py"]
         Worker["worker\nCelery worker\ntasks.py"]
         Redis[("redis\nbroker + result backend")]
-        Ollama["ollama\nqwen2.5:7b-instruct · moondream\n:11434"]
+        Ollama["ollama\nqwen2.5:7b-instruct · qwen2.5:3b-instruct · moondream\n:11434"]
 
-        Frontend -->|"/auth,/me,/upload,/files,/search-query,/queue,/media"| Api
+        Frontend -->|"/auth,/me,/upload,/add-link,/files,/search-query,/queue,/processing-log,/media"| Api
         Frontend -->|"/static, *.html"| Frontend
         Api -->|".delay() via CELERY_BROKER_URL=redis://redis:6379/0"| Redis
         Redis -.->|"consome a fila"| Worker
@@ -116,6 +121,54 @@ worker:
 > funciona hoje — todos os workers consomem a mesma fila no mesmo Redis —
 > mas não há orquestração de múltiplas réplicas configurada (fica pra
 > quando o volume justificar).
+
+### Teto de CPU/RAM em `ollama` e `worker`
+
+Classificar localmente (principalmente vídeo: `faster-whisper` + 3 legendas
+via `moondream` + classificação de texto via `qwen2.5:7b-instruct`, tudo em
+CPU) é pesado — sem limite, esses dois containers podem consumir todos os
+núcleos/RAM do host e travar a máquina inteira (WSL2/Docker Desktop não
+limita isso sozinho). `ollama` e `worker` têm `cpus`/`mem_limit` no
+`docker-compose.yml`, configuráveis via `.env` (`OLLAMA_CPUS`,
+`OLLAMA_MEM_LIMIT`, `WORKER_CPUS`, `WORKER_MEM_LIMIT`):
+
+```yaml
+# docker-compose.yml
+ollama:
+  cpus: ${OLLAMA_CPUS:-6}
+  mem_limit: ${OLLAMA_MEM_LIMIT:-6g}
+worker:
+  cpus: ${WORKER_CPUS:-2}
+  mem_limit: ${WORKER_MEM_LIMIT:-3g}
+```
+
+Pelo mesmo motivo, o `worker` roda com `--concurrency=1` (ver
+`worker/entrypoint.sh`) em vez do padrão do Celery (um processo prefork por
+núcleo): cada tarefa de IA local já é pesada sozinha — rodar várias em
+paralelo só faz competir pelos mesmos núcleos/RAM e demorar mais, sem
+ganho. Ajustável via `CELERY_WORKER_CONCURRENCY` no `.env` se a máquina
+aguentar mais de uma classificação por vez.
+
+### Containers rodam como root — cuidado com o bind mount
+
+O `Dockerfile` não define `USER`: `api`/`worker` rodam como root. Isso é
+inofensivo pro container em si, mas `data/`/`media/` são bind mounts
+(`.:/app`) — um arquivo/pasta criado por um processo root **dentro** do
+container aparece no host com dono root também. Se `data/` não existisse
+ainda na primeira vez que um container subiu, é o próprio container quem
+cria a pasta (`mkdir(parents=True)` em `api/stores.py`/`processing_log.py`)
+— e daí o usuário do host fica sem permissão de escrever/apagar ali, nem
+os próprios arquivos (`./backup.sh`/`./uninstall.sh` batiam em `Permission
+denied` tentando limpar `data/processing.db`).
+
+`install.sh` evita isso pré-criando `data/users`/`media` **como o usuário
+do host** antes de qualquer container subir — um arquivo root dentro de
+uma pasta que já é do host ainda pode ser apagado/renomeado pelo dono da
+pasta (`unlink`/`rename` só exigem permissão de escrita no diretório-pai,
+não posse do arquivo). Pra quem já tinha esse problema antes desse ajuste,
+`backup.sh`/`uninstall.sh` corrigem sozinhos a cada execução
+(`docker compose exec api chown -R "$(id -u):$(id -g)" /app/data
+/app/media`, só funciona com o container `api` no ar).
 
 ---
 
@@ -286,6 +339,53 @@ perder uma edição.
 > catálogo pessoal; não escalaria pra um catálogo compartilhado de milhões
 > de arquivos.
 
+### A exceção: SQLite só pro log de processamento
+
+`catalog.json`/`profile.json` guardam **estado atual** (poucos arquivos por
+usuário, poucas escritas, reescrever tudo a cada update é barato). O log de
+processamento (`api/processing_log.py`, usado por
+[seção 8](#8-fila-de-processamento)) é um dado de natureza diferente: cresce
+por **append** — um evento por etapa de cada classificação — e é consultado
+por usuário/data. Reescrever um JSON inteiro a cada evento não escalaria; um
+índice SQL resolve isso de forma direta. Por isso esse dado, e só ele, mora
+num SQLite (`data/processing.db`):
+
+```python
+# api/processing_log.py
+CREATE TABLE IF NOT EXISTS processing_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    task_id TEXT,
+    step TEXT NOT NULL,      -- "task" | "classify" | "upload_drive" | "catalog_sync"
+    status TEXT NOT NULL,    -- "started" | "done" | "error"
+    message TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+```
+
+> **Por que SQLite, não Postgres**: continua sendo "banco" de verdade (SQL,
+> índice, `WHERE`/`ORDER BY`), mas é só um arquivo — sem container novo, sem
+> serviço a mais no `docker-compose.yml`. Não é um substituto pro
+> `catalog.json`: o Drive continua sendo a fonte da verdade dos arquivos, e
+> migrar isso pro banco também duplicaria sincronização sem resolver nenhum
+> problema real que o JSON já tenha hoje.
+
+O arquivo mora na raiz de `data/` — o mesmo diretório já montado via bind
+mount (`.:/app`) tanto em `api` quanto em `worker` (ver
+[seção 2](#2-containers-e-como-eles-se-falam)), então os dois containers
+enxergam o mesmo arquivo em disco sem precisar de nenhum serviço extra.
+Como os dois escrevem/leem ao mesmo tempo, a conexão liga `WAL` (permite
+leitura concorrente com escrita) e um `busy_timeout` (uma escrita
+simultânea espera a outra terminar, em vez de falhar na hora com
+`"database is locked"`):
+
+```python
+# api/processing_log.py
+conn.execute("PRAGMA journal_mode=WAL")
+conn.execute(f"PRAGMA busy_timeout={_BUSY_TIMEOUT_MS}")
+```
+
 ---
 
 ## 6. Classificação: local primeiro, nuvem como rede de segurança
@@ -339,9 +439,23 @@ Como reforço além do prompt — um modelo pode ocasionalmente devolver uma
 categoria quase-idêntica a uma que já existe (typo, plural, acento) —
 `worker/tasks.py::_snap_to_known_category` compara (fuzzy, rapidfuzz) a
 categoria devolvida contra as já existentes e troca pela grafia já usada
-quando a similaridade é muito alta (`_CATEGORY_SNAP_THRESHOLD = 92`). Isso
+quando a similaridade é muito alta (`_CATEGORY_SNAP_THRESHOLD = 85`). Isso
 evita o catálogo acumular "financeiro", "finanças" e "financeiro pessoal"
 como três categorias diferentes por acidente.
+
+> **Cuidado ao escolher o algoritmo de similaridade aqui**: a comparação
+> usa `fuzz.token_sort_ratio` (string inteira) num helper próprio
+> (`_category_similarity`), **não** `api.text_match.fuzzy_score` — que usa
+> `partial_ratio`, pensado pra busca ("query aparece dentro de um candidate
+> maior"). Reaproveitar `fuzzy_score` aqui foi um bug real: "sistema"
+> pontuava 100/100 contra "sistemas operacionais" só por ser quase um
+> prefixo exato dela, colando categorias sem nenhuma relação (um vídeo
+> sobre cinto de segurança e um PDF de lista de exercícios viraram
+> "sistemas operacionais" sozinhos, vindos de um arquivo sobre Linux que
+> nada tem a ver). `token_sort_ratio` compara as strings inteiras, não
+> substring, e não confunde os dois casos — o limiar caiu de 92 pra 85
+> junto da troca (calibrado testando pares que deveriam colar contra pares
+> que não deveriam, ver comentário ao lado de `_CATEGORY_SNAP_THRESHOLD`).
 
 ### Confiança vira sinal na tela
 
@@ -361,6 +475,22 @@ A busca combina duas camadas: a IA sugere quais categorias/tags do
 catálogo do próprio usuário provavelmente correspondem à consulta
 (`scripts/analisador_busca.py`), e um critério de *matching* local decide,
 arquivo por arquivo, se isso conta como resultado.
+
+> **Modelo leve e timeout curto pra interpretar a consulta**: essa etapa
+> dispara uma chamada de IA a **cada busca digitada** — bem mais volume que
+> classificar upload, que é só uma vez por arquivo — então o que importa é
+> responder rápido, não a mesma precisão pesada usada pra ler um documento
+> inteiro. O lado Gemini já nasceu assim (`analisador_busca.py` usa
+> `gemini-3.5-flash-lite`, não o Flash "cheio" de `categorizer_gemini.py`);
+> o lado local (`busca_analyzer_local.py`) tinha um bug de origem —
+> reaproveitava sem querer o `LOCAL_AI_TEXT_MODEL` (o mesmo `7b` usado pra
+> classificar arquivo/vídeo) com o mesmo timeout de 300s da classificação,
+> então uma busca podia travar a tela por minutos se o Ollama estivesse
+> ocupado classificando algo em paralelo. Agora usa `LOCAL_AI_SEARCH_MODEL`
+> (padrão `qwen2.5:3b-instruct`, menor/mais rápido) com
+> `LOCAL_AI_SEARCH_TIMEOUT` (padrão 10s) — falha rápido e cai pro Gemini/
+> fuzzy local em vez de travar (`gerar_texto(..., timeout=...)`, ver
+> `scripts/local_ai/ollama_client.py`).
 
 > **Por que existe `api/text_match.py`**: esse critério de match precisa
 > rodar em **dois lugares diferentes**: no backend (Python, filtro final de
@@ -423,6 +553,73 @@ A tela `processing.html` mostra os dois lado a lado, com polling a cada
 4s — dá pra ver, ao vivo, uma tarefa saindo da fila do broker (`redis`) ao
 mesmo tempo em que o item correspondente muda de "processing" pra "done"
 no catálogo.
+
+### Histórico de processamento: o que os `counts` sozinhos não mostram
+
+`counts`/`pending_in_broker` (acima) são só um resumo agregado — não dá
+pra ver *qual* item está em cada status, nem sobra rastro de nada depois
+que termina. Antes, um erro de classificação virava só `status="error"` no
+catálogo, sem motivo nenhum: a exceção real só existia em
+`docker compose logs worker`, invisível na tela.
+
+`GET /processing-log` (`api/app.py::processing_log_view`, dado por
+`api/processing_log.py` — ver [seção 5](#5-sem-banco-de-dados-tudo-em-json))
+resolve isso guardando cada etapa como um evento:
+
+```python
+# worker/tasks.py — cada etapa loga início/fim, com o motivo real do erro
+processing_log.log_event(user_id, entry_id, "classify", "error", str(exc), task_id=task_id)
+...
+processing_log.log_event(user_id, entry_id, "task", "done", "Arquivo classificado e enviado ao Drive", task_id=task_id)
+```
+
+Etapas logadas por `worker/tasks.py`: `task` (início/fim da tarefa
+inteira), `classify` (resultado da IA — local ou Gemini), `upload_drive`
+(envio do arquivo real), `catalog_sync` (sincronização do
+`uploaded_files.json` de volta pro Drive) e `reprocess` (quando o
+reprocessamento manual falha antes de chegar a classificar, ver
+`worker/tasks.py::_run_reclassification`). `GET /processing-log?file_id=<id>`
+filtra pra linha do tempo de um item só.
+
+A UI (`processing.html`/`static/js/processing.js`) não usa `GET
+/processing-log` como uma lista plana — ela monta **um item por
+arquivo/link** a partir do próprio catálogo (`GET /files`, já tem
+`status`/`category`/`name` prontos) e só busca a linha do tempo detalhada
+sob demanda, quando o usuário expande aquele item. Isso dá dois níveis: um
+resumo rápido, filtrável por status (`filter-chip`, mesmo padrão do
+dashboard), e o detalhe completo (`GET /processing-log?file_id=`) só
+quando alguém pede — sem precisar carregar o histórico de eventos de todo
+mundo pra montar a lista.
+
+### Cancelar/reiniciar um item ativo — sem "pausar"
+
+Cada etapa de classificação é uma chamada síncrona e bloqueante (HTTP pro
+Ollama/Gemini, `subprocess` do ffmpeg) — não existe checkpoint no meio pra
+suspender e retomar depois. Por isso só dois botões existem nos itens
+`processing` (não um terceiro de "pausar"):
+
+```python
+# api/app.py — mata o processo do worker que está executando a tarefa
+celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+```
+
+- **`POST /files/<id>/cancel`** — revoga a tarefa e marca `status="error"`.
+- **`POST /files/<id>/restart`** — revoga a tarefa atual e dispara uma nova,
+  escolhendo qual conforme o que já foi feito: link → `classify_link_task`
+  direto pela URL; arquivo com `drive_file_id` (upload já confirmado) →
+  `reclassify_task` (mesma usada por "Reprocessar", não duplica o upload);
+  arquivo cujo upload original nunca terminou → `classify_and_catalog_task`
+  de novo, reaproveitando o arquivo ainda em `media/<id>` (só existe
+  porque o worker só apaga esse arquivo *depois* de confirmar no Drive).
+
+> **Corrida aceita**: `control.revoke()` só manda o sinal pelo broker, não
+> espera confirmação de que o worker já morreu. Se ele terminar a
+> classificação bem na hora em que o sinal chega, o `stores.update_entry(...,
+> status="done")` dele pode rodar logo depois do `status="error"` que o
+> cancelamento gravou — janela pequena (o sinal chega quase instantâneo),
+> mas existe. Fechar de vez exigiria o worker checar um estado
+> compartilhado a cada etapa antes de gravar o resultado, o que já seria
+> praticamente construir suporte a pausa de verdade.
 
 ---
 
@@ -504,22 +701,33 @@ reaproveitado em todo lugar que desenha um card, do dashboard ao resultado
 de busca: `image`, `pdf`, `video`, `doc`, `sheet`, `link`, `audio`,
 `archive`.
 
+> **Preview de imagem quebrado vira ícone, não um espaço vazio**: pra
+> imagens, `previewUrl` recebe `f.url` (`catalog-client.js::mapUploadedFileToCard`)
+> — que, depois que o arquivo sobe pro Drive, passa a ser o `webViewLink`
+> (a página HTML de visualização do Drive, não um link de imagem de
+> verdade; ver `api/google_drive.py::upload_file`). Um `<img src>` com esse
+> link falha ao carregar. Todo lugar que renderiza thumbnail
+> (`dashboard.js`, `search.js`, `file-view.js`) já desenha o ícone do tipo
+> junto, escondido, e um `onerror` no `<img>` revela ele se o carregamento
+> falhar — em vez de deixar o card sem nada.
+
 ---
 
 ## 11. Mapa de arquivos
 
 ```text
 api/
-  app.py                   rotas HTTP — upload, busca, fila, download, delete
+  app.py                   rotas HTTP — upload, busca, fila, download, delete, reprocessar/cancelar/reiniciar, log
   auth.py                  login OAuth2 com Google, sessão, /me
   csrf.py                  proteção CSRF (double-submit cookie)
   google_drive.py          toda a integração com a Drive API
   stores.py                cache local + perfil por usuário, com file lock
+  processing_log.py        log de eventos de processamento (SQLite, data/processing.db)
   text_match.py            critério único de busca (acento + fuzzy)
 worker/
   celery_app.py            cria o app Celery (broker/backend = Redis)
-  tasks.py                 tarefas assíncronas: classificar + subir pro Drive
-  entrypoint.sh             sobe o celery worker
+  tasks.py                 tarefas assíncronas: classificar/reclassificar + subir pro Drive
+  entrypoint.sh             sobe o celery worker (--concurrency configurável)
 scripts/
   processar_upload.py      orquestra local → Gemini
   categorizer_gemini.py    classificação via API do Gemini
@@ -527,20 +735,26 @@ scripts/
   extrator_conteudo.py     extrai texto de cada formato de arquivo
   local_ai/                # equivalentes locais, mesmo shape de retorno
     router.py               decide texto/imagem/vídeo, liga com o Gemini
-    ollama_client.py        cliente HTTP fino pro container Ollama
+    ollama_client.py        cliente HTTP fino pro container Ollama (timeout por chamada)
     categorizer_local.py
     video_local.py          ffmpeg + faster-whisper
+    busca_analyzer_local.py interpreta a busca — modelo/timeout próprios (rápido)
 frontend/
   nginx.conf               estático + proxy_pass pras rotas da api
   pages/                   os 8 HTMLs (dashboard, upload, busca, etc.)
 static/js/
   catalog-client.js        estado compartilhado + busca local + CSRF
   auth.js                  login/logout, window.__BUSCA_AGIL_USER__
+  task-notifications.js    notificação de classificação concluída entre páginas (localStorage)
+  file-utils.js            detecção de tipo de arquivo (upload no navegador)
   dashboard.js · search.js · file-view.js · upload.js · profile.js · processing.js
 data/users/<id>/
   catalog.json              espelho do uploaded_files.json do Drive
   profile.json               tokens OAuth + folder_id + catalog_file_id + cota
-docker-compose.yml          frontend + api + worker + redis + ollama
+data/processing.db          log de eventos de processamento (SQLite, ver api/processing_log.py)
+docker-compose.yml          frontend + api + worker + redis + ollama (cpus/mem_limit em ollama/worker)
+install.sh / uninstall.sh   sobe/desfaz tudo do zero via Docker, com smoke tests
+backup.sh                   backup/restore do estado local (--out / --in), ver README.md
 ```
 
 ---
